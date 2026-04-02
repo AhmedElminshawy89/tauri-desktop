@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Kinetic POS - نظام البيع الذكي</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-primary-fixed": "#002022",
+              "tertiary-fixed-dim": "#ffb785",
+              "inverse-surface": "#2e3132",
+              "secondary": "#4c616c",
+              "surface-variant": "#e1e3e4",
+              "surface-container-low": "#f3f4f5",
+              "on-surface-variant": "#3e494a",
+              "outline-variant": "#bdc9ca",
+              "on-secondary-container": "#526772",
+              "on-surface": "#191c1d",
+              "tertiary": "#834718",
+              "on-secondary-fixed-variant": "#354a53",
+              "outline": "#6e797a",
+              "on-tertiary-fixed-variant": "#6f3808",
+              "on-primary-container": "#d0fbff",
+              "on-error-container": "#93000a",
+              "on-tertiary": "#ffffff",
+              "surface-container-highest": "#e1e3e4",
+              "inverse-on-surface": "#f0f1f2",
+              "secondary-fixed": "#cfe6f2",
+              "on-secondary-fixed": "#071e27",
+              "secondary-fixed-dim": "#b4cad6",
+              "on-primary-fixed-variant": "#004f54",
+              "surface-container-high": "#e7e8e9",
+              "secondary-container": "#cfe6f2",
+              "on-background": "#191c1d",
+              "primary-container": "#007b83",
+              "surface-container-lowest": "#ffffff",
+              "on-tertiary-fixed": "#301400",
+              "error-container": "#ffdad6",
+              "on-primary": "#ffffff",
+              "on-tertiary-container": "#fff1e9",
+              "primary-fixed-dim": "#7ad5dd",
+              "background": "#f8f9fa",
+              "surface-container": "#edeeef",
+              "error": "#ba1a1a",
+              "inverse-primary": "#7ad5dd",
+              "surface-dim": "#d9dadb",
+              "tertiary-container": "#a05f2e",
+              "surface": "#f8f9fa",
+              "surface-tint": "#006970",
+              "tertiary-fixed": "#ffdcc6",
+              "on-secondary": "#ffffff",
+              "on-error": "#ffffff",
+              "primary-fixed": "#96f1fa",
+              "primary": "#006067",
+              "surface-bright": "#f8f9fa"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .font-headline { font-family: 'Manrope', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background overflow-hidden h-screen flex flex-col">
+<!-- TopNavBar Implementation -->
+<header class="bg-slate-50 dark:bg-slate-900 text-teal-800 dark:text-teal-400 font-['Manrope'] font-semibold tracking-tight docked full-width top-0 flex justify-between items-center w-full px-6 h-16 z-50">
+<div class="flex items-center gap-8">
+<h1 class="text-xl font-black text-teal-800 dark:text-teal-400">Kinetic POS</h1>
+<nav class="hidden md:flex gap-6 items-center">
+<a class="text-teal-700 dark:text-teal-400 border-b-2 border-teal-700 dark:border-teal-400 pb-1" href="#">لوحة التحكم</a>
+<a class="text-slate-500 dark:text-slate-400 hover:text-teal-600 dark:hover:text-teal-300 transition-colors" href="#">المخزون</a>
+<a class="text-slate-500 dark:text-slate-400 hover:text-teal-600 dark:hover:text-teal-300 transition-colors" href="#">الطلبات</a>
+<a class="text-slate-500 dark:text-slate-400 hover:text-teal-600 dark:hover:text-teal-300 transition-colors" href="#">التقارير</a>
+</nav>
+</div>
+<div class="flex items-center gap-4 flex-1 justify-end max-w-2xl px-8">
+<div class="relative w-full group">
+<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-outline">search</span>
+<input class="w-full h-10 pr-10 pl-4 bg-surface-container-high border-none rounded-xl focus:ring-2 focus:ring-primary text-sm transition-all" placeholder="ابحث عن منتج أو رمز باركود..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-200/50 dark:hover:bg-slate-800/50 transition-colors">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-200/50 dark:hover:bg-slate-800/50 transition-colors">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+<div class="flex items-center gap-3 mr-2 bg-surface-container-low p-1.5 pr-4 rounded-full border border-outline-variant/10">
+<div class="text-right">
+<p class="text-xs font-bold leading-tight text-on-surface">أحمد محمد</p>
+<p class="text-[10px] text-outline leading-tight">مشرف الوردية</p>
+</div>
+<img alt="Operator Profile" class="w-8 h-8 rounded-full object-cover" data-alt="Professional male retail operator portrait in a uniform, soft studio lighting, high quality photography" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCUM9cg6Ild_vlG5XVkXAKObRsowOQWqxOmYttIrrn7pvunQ-5Kcc2BjroJvraha-fJfdhSKVsFVpZ_qKwoFLQpq7ed4Z20D3pqRAHm1lwqnZZ3b1sb6Imtxuf4D04csLiIJf4HSgx54EDnrSwRCg9BfFqiKLAqjRT_YnH-LEypAnPuO3vVPXJaf3nIGQvZxt1W2wXf5Bg00TGlxP4OoFDyaeX8puRhM1uBeuzOw5619VKeq1gI6EeAf7bl3Sy-8z0TDJtxuAF52U0"/>
+</div>
+</div>
+</header>
+<div class="flex flex-1 overflow-hidden">
+<!-- SideNavBar Implementation -->
+<aside class="bg-slate-100 dark:bg-slate-950 font-['Inter'] text-sm font-medium docked left-0 h-full w-64 flex flex-col h-screen p-4 gap-2 z-40">
+<div class="flex items-center gap-3 mb-6 p-2">
+<div class="w-10 h-10 bg-primary-container rounded-lg flex items-center justify-center text-on-primary-container">
+<span class="material-symbols-outlined" data-icon="storefront">storefront</span>
+</div>
+<div>
+<h2 class="text-lg font-bold text-teal-900 dark:text-teal-100">الفرع الرئيسي</h2>
+<p class="text-xs text-slate-500">جهاز رقم 01</p>
+</div>
+</div>
+<button class="mb-4 w-full h-12 bg-primary text-on-primary rounded-xl flex items-center justify-center gap-2 font-bold shadow-md hover:opacity-90 active:scale-95 transition-all">
+<span class="material-symbols-outlined" data-icon="add">add</span>
+                بيع جديد
+            </button>
+<div class="space-y-1 overflow-y-auto flex-1 pr-1">
+<a class="flex items-center gap-3 p-3 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 hover:translate-x-1 transition-transform duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="grid_view">grid_view</span>
+                    جميع الأصناف
+                </a>
+<a class="flex items-center gap-3 p-3 bg-white dark:bg-slate-900 text-teal-700 dark:text-teal-400 shadow-sm rounded-lg hover:translate-x-1 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="local_cafe">local_cafe</span>
+                    المشروبات
+                </a>
+<a class="flex items-center gap-3 p-3 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 hover:translate-x-1 transition-transform duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="restaurant">restaurant</span>
+                    المأكولات
+                </a>
+<a class="flex items-center gap-3 p-3 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 hover:translate-x-1 transition-transform duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="shopping_bag">shopping_bag</span>
+                    التجزئة
+                </a>
+<a class="flex items-center gap-3 p-3 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 hover:translate-x-1 transition-transform duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="build">build</span>
+                    الخدمات
+                </a>
+<a class="flex items-center gap-3 p-3 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 hover:translate-x-1 transition-transform duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="sell">sell</span>
+                    الخصومات
+                </a>
+</div>
+<div class="mt-auto border-t border-slate-200 dark:border-slate-800 pt-4 space-y-1">
+<a class="flex items-center gap-3 p-3 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+                    الدعم الفني
+                </a>
+<a class="flex items-center gap-3 p-3 text-error hover:bg-error-container/20 rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+                    تسجيل الخروج
+                </a>
+</div>
+</aside>
+<!-- Main Content Area: Product Grid -->
+<main class="flex-1 overflow-y-auto p-8 bg-surface">
+<div class="mb-8 flex justify-between items-end">
+<div>
+<h3 class="text-2xl font-headline font-extrabold text-on-surface mb-1">المشروبات الباردة والساخنة</h3>
+<p class="text-on-surface-variant">عرض جميع الأصناف المتوفرة في هذا القسم</p>
+</div>
+<div class="flex gap-2">
+<button class="h-10 px-4 bg-surface-container-high rounded-full flex items-center gap-2 text-sm font-medium">
+<span class="material-symbols-outlined text-sm" data-icon="filter_list">filter_list</span>
+                        تصفية
+                    </button>
+<button class="h-10 px-4 bg-surface-container-high rounded-full flex items-center gap-2 text-sm font-medium">
+<span class="material-symbols-outlined text-sm" data-icon="sort">sort</span>
+                        ترتيب
+                    </button>
+</div>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
+<!-- Product Card 1 -->
+<div class="bg-surface-container-lowest rounded-xl shadow-sm hover:shadow-md transition-shadow group cursor-pointer overflow-hidden flex flex-col">
+<div class="relative h-40 overflow-hidden">
+<img alt="Iced Latte" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" data-alt="Close-up of a perfectly crafted cappuccino with latte art in a white ceramic cup on a rustic wood surface" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB8Amt-tC8L954yTCZ9Ku2EABbSyy4he7XC5Kz0T8Uo46J-ZJgWdX2FMRATpcmyDwthZHMZI3t3k0WTAvIUYMww0duCoHkVU69CiVjPlLVvqzTvQ8AMqPUXtgqrHLmAEjbDYAGJvSjl-Da578tPQM3SeniEUr6jXWugYNNgbRvJpDQNEBd7nTt6NZeYRimf9lx4FkQFrcSF6aZszug9s4YhkhdUmWx3TamY145NrhzuAqAHW0hnt8aBju3yt2SbKIsFV8oILTUEt8w"/>
+<div class="absolute top-2 right-2 bg-primary text-on-primary px-2 py-1 rounded-lg text-xs font-bold font-headline">
+                            24.00 ريال
+                        </div>
+</div>
+<div class="p-4">
+<h4 class="font-bold text-on-surface mb-1">أيس لاتيه كلاسيك</h4>
+<p class="text-xs text-on-surface-variant">قهوة عربية غنية مع حليب طازج</p>
+</div>
+</div>
+<!-- Product Card 2 -->
+<div class="bg-surface-container-lowest rounded-xl shadow-sm hover:shadow-md transition-shadow group cursor-pointer overflow-hidden flex flex-col">
+<div class="relative h-40 overflow-hidden">
+<img alt="Fruit Tea" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" data-alt="Refreshing tall glass of iced fruit tea with slices of lemon and mint leaves, vibrant colors, sunlight lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC56W5kELufF7y7JXR_SY1kl5kF1C6yBe4ykcE3P5xuifHrEcoJoqNpX5oUqHiCWHei3935lQIm9FrDXSVpN3E1rYMuf_YD0Qlo4qZDg5-1pQGsWdDE2OZSDwFxfUmo3grdL05vID3jnjyzucg33B4WIdCOJpJUwbT3_XqLuiZ7vt7BYIXuSWPY_nnk91uouato95p1GtyNwOE15_QtXv8OSE9tgG4MY46xRRhWVMLLkl8XqznHZcC9tjC4C4js1fG0_esG1uL6H7I"/>
+<div class="absolute top-2 right-2 bg-primary text-on-primary px-2 py-1 rounded-lg text-xs font-bold font-headline">
+                            18.50 ريال
+                        </div>
+</div>
+<div class="p-4">
+<h4 class="font-bold text-on-surface mb-1">شاي الفواكه الاستوائية</h4>
+<p class="text-xs text-on-surface-variant">مزيج منعش من الفواكه والنعناع</p>
+</div>
+</div>
+<!-- Product Card 3 -->
+<div class="bg-surface-container-lowest rounded-xl shadow-sm hover:shadow-md transition-shadow group cursor-pointer overflow-hidden flex flex-col">
+<div class="relative h-40 overflow-hidden">
+<img alt="Mocha" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" data-alt="Rich chocolate mocha with whipped cream and chocolate shavings in a glass mug, moody atmosphere" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAjzeSOQ9TODlqS5m7nVlOMEx58cJkO5EWUg9yWfbXBmn8jtsGpo3B958K06qr5Dm-DVfTbCMhCSeW2G_ZZDIy5ivGqZtwSeuwUvBMXoyLatFYHBPVYR-NGzU5Ytdcv5tdSGPLmsBEHacIiC_hFQnv_PbcRjW3muk4HacaQGsirVFkdqYE2bEtXA_54KxKGK7OqWwMZunNMpLCmIdtivkAvRdaAjC2Ns7RDhDH16rrI0Mztee9rdItoke31xrUsG0JM0NU8ZJUlsnc"/>
+<div class="absolute top-2 right-2 bg-primary text-on-primary px-2 py-1 rounded-lg text-xs font-bold font-headline">
+                            22.00 ريال
+                        </div>
+</div>
+<div class="p-4">
+<h4 class="font-bold text-on-surface mb-1">شوكولاتة موكا داكنة</h4>
+<p class="text-xs text-on-surface-variant">كريمة مخفوقة مع صوص الشوكولاتة</p>
+</div>
+</div>
+<!-- Product Card 4 -->
+<div class="bg-surface-container-lowest rounded-xl shadow-sm hover:shadow-md transition-shadow group cursor-pointer overflow-hidden flex flex-col">
+<div class="relative h-40 overflow-hidden">
+<img alt="Fresh Juice" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" data-alt="Glass of fresh squeezed orange juice on a white marble table with orange slices beside it, bright natural morning light" src="https://lh3.googleusercontent.com/aida-public/AB6AXuALWM8A-cCB878Lb93BUuliKA0sX8nuAb0o_KAj1pj9EmA6eTMeMs90NIPauyQx8j2oSL-L96rkebCgRWFzSb4kT7NYchzMO01pOFe1AZ9FMq5Gi5NZeQL8FRbS8aHF9lo6NPnxEj0wFnvtrVWYdTDm9ffbVJWG43htOmq4jexGV3ZfGlKC6GjyDWWpfi_WkGORw6T0qVNmNzZnck1Jt_DB7ZXxY0bSXeTRAZEhmt5GzRzlVL_sU5_saeKacEyCDiPmybFh2p_KjeE"/>
+<div class="absolute top-2 right-2 bg-primary text-on-primary px-2 py-1 rounded-lg text-xs font-bold font-headline">
+                            15.00 ريال
+                        </div>
+</div>
+<div class="p-4">
+<h4 class="font-bold text-on-surface mb-1">عصير برتقال طازج</h4>
+<p class="text-xs text-on-surface-variant">يُحضر عند الطلب بدون إضافات</p>
+</div>
+</div>
+<!-- Product Card 5 -->
+<div class="bg-surface-container-lowest rounded-xl shadow-sm hover:shadow-md transition-shadow group cursor-pointer overflow-hidden flex flex-col">
+<div class="relative h-40 overflow-hidden">
+<img alt="Espresso" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" data-alt="Double shot of espresso in a small black cup with thick crema, dark aesthetic, coffee beans scattered" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD7bWlYOUSjlMGl9PnkVwQ0DP2c0Mm_NBXEymDU9WYzrphc4FMNXkw3MV1L0GHFcr5W3ceuXmGgNxDM-WZqA4KLd_A3kO-rnr4aILC0b_96lRJ_MJklOHETgsSRFGdo5ETKctScIOsouUuShAUD_kL-oyC7CZ0EUJKojgrStm7rUaSbTWMkTg-kDRvYfTQiKZEZ4wGIqWWsnDC7_VhXciq6cD4uIVOfgyllFALUjRWnzx0_zr1E7vG2IzidiD2uQHlpib2cnoVgw98"/>
+<div class="absolute top-2 right-2 bg-primary text-on-primary px-2 py-1 rounded-lg text-xs font-bold font-headline">
+                            12.00 ريال
+                        </div>
+</div>
+<div class="p-4">
+<h4 class="font-bold text-on-surface mb-1">اسبريسو مزدوج</h4>
+<p class="text-xs text-on-surface-variant">تحميص إيطالي فاخر، طعم قوي</p>
+</div>
+</div>
+<!-- Repeat or dummy cards for layout -->
+<div class="bg-surface-container-lowest rounded-xl shadow-sm hover:shadow-md transition-shadow group cursor-pointer overflow-hidden flex flex-col opacity-60">
+<div class="bg-surface-container h-40 flex items-center justify-center">
+<span class="material-symbols-outlined text-4xl text-outline-variant" data-icon="image">image</span>
+</div>
+<div class="p-4">
+<div class="h-4 bg-surface-container rounded-full w-3/4 mb-2"></div>
+<div class="h-3 bg-surface-container rounded-full w-1/2"></div>
+</div>
+</div>
+</div>
+</main>
+<!-- Right Side Cart/Order Panel -->
+<aside class="w-[420px] bg-white border-r border-outline-variant/10 shadow-[-4px_0_24px_rgba(0,0,0,0.02)] flex flex-col">
+<!-- Order Header -->
+<div class="p-6 border-b border-outline-variant/10 bg-surface-container-lowest">
+<div class="flex justify-between items-start mb-4">
+<div>
+<h3 class="font-headline font-extrabold text-lg text-primary">فاتورة رقم #12894</h3>
+<p class="text-xs text-on-surface-variant">تاريخ: 15 أكتوبر 2023 - 04:30 م</p>
+</div>
+<button class="w-10 h-10 flex items-center justify-center rounded-full bg-secondary-container text-on-secondary-container">
+<span class="material-symbols-outlined" data-icon="person_add">person_add</span>
+</button>
+</div>
+<div class="bg-surface-container-low p-3 rounded-xl flex items-center gap-3">
+<span class="material-symbols-outlined text-primary" data-icon="person">person</span>
+<div>
+<p class="text-xs text-outline leading-none mb-1">العميل</p>
+<p class="text-sm font-bold text-on-surface">عميل نقدي (افتراضي)</p>
+</div>
+</div>
+</div>
+<!-- Cart Table -->
+<div class="flex-1 overflow-y-auto px-4 py-2 space-y-3">
+<!-- Item 1 -->
+<div class="p-3 bg-surface-container-low rounded-xl group relative">
+<div class="flex justify-between mb-2">
+<h4 class="font-bold text-on-surface">أيس لاتيه كلاسيك</h4>
+<button class="text-outline hover:text-error opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-lg" data-icon="delete">delete</span>
+</button>
+</div>
+<div class="grid grid-cols-2 gap-2 text-xs mb-3">
+<div class="flex flex-col">
+<span class="text-outline">السعر الأصلي</span>
+<span class="line-through">24.00 ريال</span>
+</div>
+<div class="flex flex-col">
+<span class="text-outline">بعد الخصم</span>
+<span class="text-tertiary font-bold">21.60 ريال</span>
+</div>
+</div>
+<div class="flex justify-between items-center">
+<div class="flex items-center gap-2 bg-surface-container-lowest rounded-lg p-1 border border-outline-variant/30">
+<button class="w-8 h-8 flex items-center justify-center rounded-md hover:bg-surface-container-high">
+<span class="material-symbols-outlined text-sm" data-icon="remove">remove</span>
+</button>
+<span class="w-6 text-center font-bold">2</span>
+<button class="w-8 h-8 flex items-center justify-center rounded-md hover:bg-surface-container-high">
+<span class="material-symbols-outlined text-sm" data-icon="add">add</span>
+</button>
+</div>
+<div class="text-left">
+<p class="text-[10px] text-outline">المجموع الفرعي</p>
+<p class="font-headline font-bold text-primary">43.20 ريال</p>
+</div>
+</div>
+</div>
+<!-- Item 2 -->
+<div class="p-3 bg-white border border-outline-variant/30 rounded-xl group relative">
+<div class="flex justify-between mb-2">
+<h4 class="font-bold text-on-surface">شاي الفواكه الاستوائية</h4>
+<button class="text-outline hover:text-error opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-lg" data-icon="delete">delete</span>
+</button>
+</div>
+<div class="grid grid-cols-2 gap-2 text-xs mb-3">
+<div class="flex flex-col">
+<span class="text-outline">السعر الأصلي</span>
+<span>18.50 ريال</span>
+</div>
+<div class="flex flex-col">
+<span class="text-outline">بعد الخصم</span>
+<span class="text-on-surface-variant">-</span>
+</div>
+</div>
+<div class="flex justify-between items-center">
+<div class="flex items-center gap-2 bg-surface-container-lowest rounded-lg p-1 border border-outline-variant/30">
+<button class="w-8 h-8 flex items-center justify-center rounded-md hover:bg-surface-container-high">
+<span class="material-symbols-outlined text-sm" data-icon="remove">remove</span>
+</button>
+<span class="w-6 text-center font-bold">1</span>
+<button class="w-8 h-8 flex items-center justify-center rounded-md hover:bg-surface-container-high">
+<span class="material-symbols-outlined text-sm" data-icon="add">add</span>
+</button>
+</div>
+<div class="text-left">
+<p class="text-[10px] text-outline">المجموع الفرعي</p>
+<p class="font-headline font-bold text-primary">18.50 ريال</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Cart Summary & Actions -->
+<div class="p-6 bg-surface-container-lowest border-t border-outline-variant/20 shadow-[0_-8px_24px_rgba(0,0,0,0.03)]">
+<div class="space-y-2 mb-6">
+<div class="flex justify-between text-sm text-on-surface-variant">
+<span>المجموع الفرعي</span>
+<span>61.70 ريال</span>
+</div>
+<div class="flex justify-between text-sm text-on-surface-variant">
+<span>الضريبة (15%)</span>
+<span>9.26 ريال</span>
+</div>
+<div class="flex justify-between text-sm text-tertiary font-medium">
+<span>إجمالي الخصم</span>
+<span>-4.80 ريال</span>
+</div>
+<div class="pt-2 border-t border-dashed border-outline-variant mt-2 flex justify-between items-end">
+<span class="font-headline font-extrabold text-on-surface">الإجمالي النهائي</span>
+<div class="text-left">
+<span class="text-3xl font-headline font-black text-primary">66.16</span>
+<span class="text-xs font-bold text-primary mr-1">ريال</span>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-3 mb-3">
+<button class="h-12 border border-outline-variant text-on-surface-variant rounded-xl font-bold hover:bg-surface-container-high transition-colors flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-lg" data-icon="pause">pause</span>
+                        تعليق
+                    </button>
+<button class="h-12 bg-surface-container-highest text-tertiary rounded-xl font-bold hover:bg-tertiary-fixed/30 transition-colors flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-lg" data-icon="cancel">cancel</span>
+                        إلغاء
+                    </button>
+</div>
+<button class="w-full h-16 bg-gradient-to-r from-primary to-primary-container text-on-primary rounded-2xl font-black text-xl flex items-center justify-center gap-4 shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all">
+                    دفع الآن
+                    <span class="material-symbols-outlined text-3xl" data-icon="payments">payments</span>
+</button>
+</div>
+</aside>
+</div>
+</body></html>
