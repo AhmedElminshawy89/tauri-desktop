@@ -21,6 +21,9 @@ import BarcodePrintPage from "./pages/BarcodePrintPage";
 import ExpensesPage from "./pages/ExpensesPage";
 import AttendancePage from "./pages/AttendancePage";
 
+import PurchasesPage from "./pages/PurchasesPage";
+import SuppliersPage from "./pages/SuppliersPage";
+
 function App() {
   // 1. استرجاع بيانات اليوزر من المتصفح عند التحميل لأول مرة
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
@@ -99,6 +102,9 @@ element={!isAuthenticated ? <Login onLogin={handleLoginSuccess} showToast={showT
           <Route path="editBill" element={<EditBill showToast={showToast} />} />
           <Route path="settings" element={<SettingsPage showToast={showToast} />} />
           <Route path="stats" element={<StatsPage showToast={showToast} />} />
+
+          <Route path="/suppliers" element={<SuppliersPage showToast={showToast} />} />
+          <Route path="/purchases" element={<PurchasesPage showToast={showToast} />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" />} />

@@ -39,6 +39,7 @@ const DashboardLayout = ({ onLogout, currentUser }) => {
     people: false,
     reports: false,
     accounting: false,
+    // purchases: false,
   });
 
   const toggleMenu = (menu) => {
@@ -141,6 +142,9 @@ const DashboardLayout = ({ onLogout, currentUser }) => {
               <NavLink to="/suppliers" className="sub-nav-item">
                 <Truck size={16} /> الموردين
               </NavLink>
+              <NavLink to="/purchases" className="sub-nav-item">
+              <ShoppingCart size={16} /> المشتريات
+                </NavLink>
               <NavLink to="/inventory" className="sub-nav-item">
                 <PackageSearch size={16} /> جرد المخزن
               </NavLink>
@@ -149,6 +153,37 @@ const DashboardLayout = ({ onLogout, currentUser }) => {
               </NavLink>
             </div>
           )}
+
+
+
+
+
+           {/* 3. الموردين المشتريات
+          <DropdownTrigger
+            title="موردين والمشتريات"
+            icon={Box}
+            isOpen={openMenus.purchases}
+            onClick={() => toggleMenu("inventory")}
+          />
+          {openMenus.inventory && (
+            <div className="dropdown-content">
+              <NavLink to="/products" className="sub-nav-item">
+                <Tags size={16} /> قائمة الملابس
+              </NavLink>
+              <NavLink to="/categories" className="sub-nav-item">
+                <Layers size={16} /> التصنيفات
+              </NavLink>
+              <NavLink to="/suppliers" className="sub-nav-item">
+                <Truck size={16} /> الموردين
+              </NavLink>
+              <NavLink to="/inventory" className="sub-nav-item">
+                <PackageSearch size={16} /> جرد المخزن
+              </NavLink>
+              <NavLink to="/barcode" className="sub-nav-item">
+                <Barcode size={16} /> طباعة الباركود
+              </NavLink>
+            </div>
+          )} */}
 
           {/* 4. الحسابات والمالية */}
           {currentUser?.role === "Admin" && (
