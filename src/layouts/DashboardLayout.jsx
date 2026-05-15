@@ -28,6 +28,7 @@ import {
   Edit3,
   HandCoins,
   CheckIcon,
+  TrendingUp,
 } from "lucide-react";
 
 const DashboardLayout = ({ onLogout, currentUser }) => {
@@ -185,9 +186,7 @@ const DashboardLayout = ({ onLogout, currentUser }) => {
             </div>
           )} */}
 
-          {/* 4. الحسابات والمالية */}
-          {currentUser?.role === "Admin" && (
-            <>
+
               <DropdownTrigger
                 title="المالية"
                 icon={Wallet}
@@ -212,8 +211,6 @@ const DashboardLayout = ({ onLogout, currentUser }) => {
                   </NavLink>
                 </div>
               )}
-            </>
-          )}
 
           {/* 5. الأشخاص */}
           <DropdownTrigger
@@ -239,8 +236,6 @@ const DashboardLayout = ({ onLogout, currentUser }) => {
           )}
 
           {/* 6. التقارير */}
-          {currentUser?.role === "Admin" && (
-            <>
               <DropdownTrigger
                 title="التقارير"
                 icon={BarChart3}
@@ -261,10 +256,11 @@ const DashboardLayout = ({ onLogout, currentUser }) => {
                   <NavLink to="/reports/stock-alerts" className="sub-nav-item">
                     تقارير النواقص
                   </NavLink>
+                  <NavLink to="/commission-report" className="sub-nav-item">
+                    <TrendingUp size={16} /> تقرير العمولة
+                  </NavLink>
                 </div>
               )}
-            </>
-          )}
 
           <NavLink
             to="/settings"

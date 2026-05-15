@@ -1,307 +1,211 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Banknote,
-  CheckCircle2,
   CreditCard,
   Printer,
   Repeat,
-  Wallet,
-  Calendar,
-  Info,
+  HandCoins,
   Trash2,
   Plus,
-  Clock,
-  HandCoins,
+  AlertTriangle,
 } from "lucide-react";
 
-const PaymentModal = ({ finalTotal, onConfirm, onCancel }) => {
+const PaymentModal = ({ finalTotal, onConfirm, onCancel, existingPaymentData = null }) => {
   const [method, setMethod] = useState("cash");
-  const [cashGiven, setCashGiven] = useState("");
-  const [firstPayment, setFirstPayment] = useState("");
-
-  // نظام الأقساط اليدوي
-  const [manualInstallments, setManualInstallments] = useState([
-    { id: Date.now(), due_date: "", amount_due: "" },
-  ]);
+  const [cashGiven, setCashGiven] = useState(existingPaymentData?.cash_given?.toString() || "");
+  const [firstPayment, setFirstPayment] = useState(existingPaymentData?.paid_amount?.toString() || "");
+  
+  const [installments, setInstallments] = useState(() => {
+    if (existingPaymentData?.installment_plan?.length > 0) {
+      return existingPaymentData.installment_plan.map((inst, idx) => ({
+        id: Date.now() + idx,
+        due_date: inst.due_date,
+        amount_due: inst.amount_due?.toString() || "",
+      }));
+    }
+    return [{ id: Date.now(), due_date: "", amount_due: "" }];
+  });
 
   const firstPayNum = parseFloat(firstPayment || 0);
-  const remainingTotal = Math.max(0, finalTotal - firstPayNum);
-
-  // حساب إجمالي المبالغ التي تم توزيعها يدوياً
-  const distributedAmount = manualInstallments.reduce(
+  const totalRemaining = Math.max(0, finalTotal - firstPayNum);
+  
+  const distributedAmount = installments.reduce(
     (sum, inst) => sum + parseFloat(inst.amount_due || 0),
     0
   );
-  const diff = remainingTotal - distributedAmount;
+  const diff = totalRemaining - distributedAmount;
+  const isInstallmentValid = installments.every(inst => inst.due_date && parseFloat(inst.amount_due) > 0) && Math.abs(diff) < 0.01 && firstPayNum > 0;
 
   const addInstallmentRow = () => {
-    setManualInstallments([
-      ...manualInstallments,
+    setInstallments([
+      ...installments,
       { id: Date.now(), due_date: "", amount_due: "" },
     ]);
   };
 
   const removeRow = (id) => {
-    setManualInstallments(manualInstallments.filter((row) => row.id !== id));
+    if (installments.length === 1) return;
+    setInstallments(installments.filter((row) => row.id !== id));
   };
 
   const updateRow = (id, field, value) => {
-    setManualInstallments(
-      manualInstallments.map((row) =>
+    setInstallments(
+      installments.map((row) =>
         row.id === id ? { ...row, [field]: value } : row
       )
     );
   };
 
+  const calculateChange = () => {
+    const given = parseFloat(cashGiven || 0);
+    return given >= finalTotal ? given - finalTotal : 0;
+  };
+
   const handleConfirm = () => {
     const paymentResult = {
-      method,
-      total_after_discount: finalTotal,
+      method: method,
       paid_amount: method === "installment" ? firstPayNum : finalTotal,
-      remaining_amount: method === "installment" ? remainingTotal : 0,
-      installments_count: manualInstallments.length,
-      payment_entry: {
-        amount: method === "installment" ? firstPayNum : finalTotal,
-        type:
-          method === "visa"
-            ? "visa_payment"
-            : method === "installment"
-              ? "down_payment"
-              : "full_payment",
-        date: new Date().toISOString(),
-        note:
-          method === "installment"
-            ? `مقدم تقسيط (${manualInstallments.length} قسط يدوي)`
-            : `دفع ${method}`,
-      },
-      // إرسال المواعيد اليدوية
-      installment_plan:
-        method === "installment"
-          ? manualInstallments.map((inst) => ({
-              due_date: inst.due_date,
-              amount_due: parseFloat(inst.amount_due),
-              status: "pending",
-            }))
-          : [],
+      remaining_amount: method === "installment" ? totalRemaining : 0,
+      installments_count: method === "installment" ? installments.length : 0,
+      cash_given: method === "cash" ? parseFloat(cashGiven || 0) : null,
+      change_amount: method === "cash" ? calculateChange() : 0,
+      total_amount: finalTotal,
+      installment_plan: method === "installment" 
+        ? installments.map(inst => ({
+            due_date: inst.due_date,
+            amount_due: parseFloat(inst.amount_due),
+            status: "pending",
+          }))
+        : [],
     };
 
+    console.log("📦 PaymentModal sending:", paymentResult);
     onConfirm(paymentResult);
-    onCancel();
+  };
+
+  const isConfirmDisabled = () => {
+    if (method === "installment") {
+      return !isInstallmentValid;
+    }
+    if (method === "cash") {
+      const given = parseFloat(cashGiven || 0);
+      return given < finalTotal;
+    }
+    return false;
   };
 
   return (
-    <div className="modal-overlay">
-      <div
-        className="modal-content-premium form-modal"
-        style={{ maxWidth: 550 }}
-      >
-        <div className="modal-header">
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <HandCoins size={20} color="#3498db" />
-            <h3 style={{ marginTop: "12px" }}>إنهاء المعاملة وتخصيص الدفع</h3>
+    <div className="ei-modal-overlay" onClick={onCancel}>
+      <div className="ei-modal" style={{ maxWidth: 550 }} onClick={(e) => e.stopPropagation()}>
+        <div className="ei-modal-header">
+          <div className="ei-modal-icon green"><HandCoins size={20} /></div>
+          <div>
+            <div className="ei-modal-title">إنهاء المعاملة</div>
+            <div style={{ fontSize: 12, color: "var(--text3)" }}>
+              الإجمالي: <strong style={{ color: "var(--green)" }}>{finalTotal.toLocaleString()} ج.م</strong>
+            </div>
           </div>
         </div>
 
-        <div style={{ padding: "20px" }}>
-          {/* خيارات الدفع الثلاثة */}
-          <div
-            className="payment-methods"
-            style={{
-              marginBottom: "20px",
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr 1fr",
-              gap: "10px",
-            }}
-          >
+        <div className="ei-modal-body">
+          <div className="ei-payment-label">طريقة الدفع</div>
+          <div className="ei-payment-methods" style={{ marginBottom: 20 }}>
             <button
-              className={`pay-method-btn ${method === "cash" ? "active" : ""}`}
+              className={`ei-pay-btn ${method === "cash" ? "active green" : ""}`}
               onClick={() => setMethod("cash")}
             >
-              <Banknote size={20} /> <span>كاش</span>
+              <Banknote size={18} /> كاش
             </button>
             <button
-              className={`pay-method-btn ${method === "visa" ? "active" : ""}`}
+              className={`ei-pay-btn ${method === "visa" ? "active" : ""}`}
               onClick={() => setMethod("visa")}
             >
-              <CreditCard size={20} /> <span>فيزا</span>
+              <CreditCard size={18} /> فيزا
             </button>
             <button
-              className={`pay-method-btn ${method === "installment" ? "active" : ""}`}
+              className={`ei-pay-btn ${method === "installment" ? "active" : ""}`}
               onClick={() => setMethod("installment")}
             >
-              <Repeat size={20} /> <span>تقسيط</span>
+              <Repeat size={18} /> تقسيط
             </button>
           </div>
 
+          {/* كاش */}
+          {method === "cash" && (
+            <div className="ei-installment-box" style={{ background: "rgba(16, 185, 129, 0.06)" }}>
+              <div className="ei-installment-label">المبلغ المستلم من العميل</div>
+              <input
+                type="number"
+                value={cashGiven}
+                className="ei-installment-input"
+                onChange={(e) => setCashGiven(e.target.value)}
+                placeholder="أدخل المبلغ"
+                autoFocus
+              />
+              {parseFloat(cashGiven || 0) >= finalTotal && (
+                <div className="ei-remaining-row" style={{ marginTop: 8 }}>
+                  <span className="lbl">المبلغ المتبقي للعميل</span>
+                  <span className="val" style={{ color: "var(--green)" }}>
+                    {(parseFloat(cashGiven || 0) - finalTotal).toFixed(2)} ج.م
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* فيزا */}
+          {method === "visa" && (
+            <div className="ei-installment-box" style={{ textAlign: "center", padding: 30 }}>
+              <CreditCard size={48} style={{ color: "var(--accent)", marginBottom: 12 }} />
+              <div style={{ fontSize: 20, fontWeight: "bold" }}>{finalTotal.toLocaleString()} ج.م</div>
+              <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 8 }}>سيتم الخصم عبر ماكينة الفيزا</div>
+            </div>
+          )}
+
+          {/* تقسيط */}
           {method === "installment" && (
-            <div className="animate-fade-in">
-              <div
-                className="input-group full-width"
-                style={{ marginBottom: "15px" }}
-              >
-                <label>المبلغ المقدم الآن</label>
+            <>
+              <div className="ei-installment-box" style={{ marginBottom: 15 }}>
+                <div className="ei-installment-label">المبلغ المقدم (الدفعة الأولى)</div>
                 <input
                   type="number"
                   value={firstPayment}
-                  className="premium-input"
+                  className="ei-installment-input"
                   onChange={(e) => setFirstPayment(e.target.value)}
                   placeholder="0.00"
                 />
-                <div
-                  style={{
-                    fontSize: "12px",
-                    color: "#3498db",
-                    marginTop: "5px",
-                  }}
-                >
-                  المتبقي لجدولته:{" "}
-                  <strong>{remainingTotal.toLocaleString()} ج.م</strong>
+                <div className="ei-remaining-row" style={{ marginTop: 8 }}>
+                  <span className="lbl">المتبقي للتقسيط</span>
+                  <span className="val" style={{ color: "var(--amber)" }}>{totalRemaining.toLocaleString()} ج.م</span>
                 </div>
               </div>
 
-              <div
-                style={{
-                  maxHeight: "200px",
-                  overflowY: "auto",
-                  padding: "5px",
-                }}
-              >
-                <label
-                  style={{
-                    fontSize: "13px",
-                    marginBottom: "10px",
-                    display: "block",
-                    color: "#94a3b8",
-                  }}
-                >
-                  جدول المواعيد اليدوي:
-                </label>
-                {manualInstallments.map((inst, index) => (
-                  <div
-                    key={inst.id}
-                    style={{
-                      display: "flex",
-                      gap: "10px",
-                      marginBottom: "10px",
-                      alignItems: "center",
-                    }}
-                    className="discount-inputs"
-                  >
-                    <span className={`rank-badge rank-${index + 1}`}>
-                      {index + 1}
-                    </span>
-                    <input
-                      type="date"
-                      className="premium-input"
-                      style={{ flex: 2 }}
-                      value={inst.due_date}
-                      onChange={(e) =>
-                        updateRow(inst.id, "due_date", e.target.value)
-                      }
-                    />
-                    <input
-                      type="number"
-                      className="premium-input"
-                      style={{ flex: 1 }}
-                      value={inst.amount_due}
-                      onChange={(e) =>
-                        updateRow(inst.id, "amount_due", e.target.value)
-                      }
-                      placeholder="المبلغ"
-                    />
-                    <button
-                      onClick={() => removeRow(inst.id)}
-                      style={{
-                        color: "#ef4444",
-                        background: "none",
-                        border: "none",
-                        cursor: "pointer",
-                      }}
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                ))}
-              </div>
+              <div className="ei-payment-label">جدول الأقساط</div>
+              {installments.map((inst, index) => (
+                <div key={inst.id} style={{ display: "flex", gap: 10, marginBottom: 10, alignItems: "center" }}>
+                  <span style={{ minWidth: 28, height: 28, background: "var(--surface2)", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12 }}>{index + 1}</span>
+                  <input type="date" className="ei-field-input" style={{ flex: 2 }} value={inst.due_date} onChange={(e) => updateRow(inst.id, "due_date", e.target.value)} />
+                  <input type="number" className="ei-field-input" style={{ flex: 1 }} value={inst.amount_due} onChange={(e) => updateRow(inst.id, "amount_due", e.target.value)} placeholder="المبلغ" />
+                  <button onClick={() => removeRow(inst.id)} style={{ background: "rgba(239,68,68,0.1)", border: "none", borderRadius: 6, width: 32, height: 32, cursor: "pointer", color: "#ef4444" }} disabled={installments.length === 1}><Trash2 size={14} /></button>
+                </div>
+              ))}
+              <button onClick={addInstallmentRow} className="ei-btn ei-btn-secondary" style={{ width: "100%", justifyContent: "center", gap: 6, marginBottom: 12 }}><Plus size={14} /> إضافة قسط</button>
 
-              <button
-                onClick={addInstallmentRow}
-                className="action-btn edit"
-                style={{
-                  width: "100%",
-                  marginTop: "10px",
-                  display: "flex",
-                  justifyContent: "center",
-                  gap: "5px",
-                  fontSize: "12px",
-                }}
-              >
-                <Plus size={14} /> إضافة قسط آخر
-              </button>
-
-              <div
-                style={{
-                  marginTop: "15px",
-                  padding: "10px",
-                  borderRadius: "8px",
-                  background:
-                    Math.abs(diff) < 1
-                      ? "rgba(46, 204, 113, 0.1)"
-                      : "rgba(239, 68, 68, 0.1)",
-                  fontSize: "12px",
-                  textAlign: "center",
-                }}
-              >
-                {diff === 0
-                  ? " المبالغ مطابقة للمتبقي"
-                  : `فرق المبالغ: ${diff.toLocaleString()} ج.م`}
-              </div>
-            </div>
-          )}
-
-          {(method === "cash" || method === "visa") && (
-            <div
-              style={{
-                textAlign: "center",
-                padding: "30px",
-                background: "rgba(255,255,255,0.02)",
-                borderRadius: "15px",
-                border: "1px solid rgba(255,255,255,0.05)",
-              }}
-            >
-              <span style={{ color: "#94a3b8" }}>
-                {method === "visa"
-                  ? "سيتم الخصم عبر ماكينة الفيزا"
-                  : "المبلغ المطلوب نقداً"}
-              </span>
-              <h2
-                style={{
-                  color: method === "visa" ? "#3498db" : "#2ecc71",
-                  fontSize: "2.4rem",
-                  marginTop: "10px",
-                }}
-              >
-                {finalTotal.toLocaleString()} ج.م
-              </h2>
-            </div>
+              {Math.abs(diff) >= 0.01 && (
+                <div className="ei-warning-box" style={{ marginTop: 8 }}>
+                  <AlertTriangle size={14} />
+                  المتبقي: {totalRemaining.toLocaleString()} ج.م | تم توزيع: {distributedAmount.toLocaleString()} ج.م | الباقي: {diff.toLocaleString()} ج.م
+                </div>
+              )}
+            </>
           )}
         </div>
 
-        <div className="modal-footer" style={{ display: "flex", gap: "10px" }}>
-          <button
-            className="btn-save flex-2"
-            onClick={handleConfirm}
-            disabled={
-              method === "installment" &&
-              (Math.abs(diff) > 1 ||
-                manualInstallments.some((i) => !i.due_date || !i.amount_due))
-            }
-          >
-            <Printer size={18} /> تأكيد العملية
+        <div className="ei-modal-footer">
+          <button className="ei-btn ei-btn-primary" style={{ flex: 2, justifyContent: "center" }} onClick={handleConfirm} disabled={isConfirmDisabled()}>
+            <Printer size={16} /> تأكيد
           </button>
-          <button className="btn-cancel flex-1" onClick={onCancel}>
-            إلغاء
-          </button>
+          <button className="ei-btn ei-btn-ghost" style={{ flex: 1, justifyContent: "center" }} onClick={onCancel}>إلغاء</button>
         </div>
       </div>
     </div>

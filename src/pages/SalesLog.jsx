@@ -18,7 +18,17 @@ import {
   RotateCcw,
   Receipt,
   Percent,
+  Users,
+  Clock,
+  DollarSign,
+  FileText,
+  Package,
+  ArrowLeftRight,
+  Edit,
+  CalendarDays,
+  Wallet,
 } from "lucide-react";
+import EditBill from "./EditBill";
 
 // ─── ثوابت ───────────────────────────────────────────────────────────────────
 
@@ -47,7 +57,6 @@ const PAYMENT_MAP = {
 };
 
 // ─── حساب الحالة الفعلية للفاتورة ────────────────────────────────────────────
-// نحسبها من الأرقام الحقيقية، مش نعتمد على الـ status المخزن بس
 const deriveStatus = (invoice, totalReturned) => {
   const total = Number(invoice.total_after_discount) || 0;
   const returned = Number(totalReturned) || 0;
@@ -55,8 +64,8 @@ const deriveStatus = (invoice, totalReturned) => {
   if (returned <= 0) {
     return invoice.status === "pending" ? "pending" : "completed";
   }
-  if (returned >= total) return "returned";      // مرتجع كلي
-  return "partial_returned";                      // مرتجع جزئي
+  if (returned >= total) return "returned";
+  return "partial_returned";
 };
 
 const STATUS_MAP = {
@@ -87,8 +96,9 @@ const STATUS_MAP = {
 };
 
 // ─── مكوّن Badge ──────────────────────────────────────────────────────────────
-const Badge = ({ bg, text, border, icon, label }) => (
+const Badge = ({ bg, text, border, icon, label, onClick }) => (
   <span
+    onClick={onClick}
     style={{
       display: "inline-flex",
       alignItems: "center",
@@ -100,6 +110,7 @@ const Badge = ({ bg, text, border, icon, label }) => (
       backgroundColor: bg,
       color: text,
       border: `1px solid ${border}`,
+      cursor: onClick ? "pointer" : "default",
     }}
   >
     {icon}
@@ -127,7 +138,7 @@ const InfoRow = ({ icon, label, value, valueStyle = {} }) => (
 );
 
 // ─── عنوان قسم داخل المودال ───────────────────────────────────────────────────
-const SectionTitle = ({ label, color = "#94a3b8" }) => (
+const SectionTitle = ({ label, color = "#94a3b8", icon }) => (
   <p
     style={{
       color,
@@ -135,8 +146,12 @@ const SectionTitle = ({ label, color = "#94a3b8" }) => (
       fontWeight: "700",
       letterSpacing: "1px",
       marginBottom: "10px",
+      display: "flex",
+      alignItems: "center",
+      gap: "6px",
     }}
   >
+    {icon}
     {label}
   </p>
 );
@@ -158,8 +173,11 @@ const SectionBox = ({ children, borderColor = "rgba(255,255,255,0.08)" }) => (
 const SalesLog = ({ showToast }) => {
   const [invoices, setInvoices] = useState([]);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [editInvoiceId, setEditInvoiceId] = useState(null);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterDate, setFilterDate] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
   const [loading, setLoading] = useState(true);
   const [deleteModal, setDeleteModal] = useState({
     show: false,
@@ -167,11 +185,7 @@ const SalesLog = ({ showToast }) => {
     reason: "",
   });
 
-  useEffect(() => {
-    fetchInvoices();
-  }, [filterDate]);
-
-  // ─── جلب الفواتير + مجموع المرتجعات لكل فاتورة بـ subquery ───────────────
+  // ─── جلب الفواتير ──────────────────────────────────────────────────────────
   const fetchInvoices = async () => {
     try {
       setLoading(true);
@@ -179,8 +193,11 @@ const SalesLog = ({ showToast }) => {
 
       let query = `
         SELECT i.*,
-               COALESCE((SELECT SUM(r.amount) FROM returns r WHERE r.invoice_id = i.id), 0) AS total_returned
+               COALESCE((SELECT SUM(r.amount) FROM returns r WHERE r.invoice_id = i.id), 0) AS total_returned,
+               e.name AS seller_name,
+               e.commission_rate
         FROM invoices i
+        LEFT JOIN employees e ON i.seller_id = e.id
         ORDER BY i.id DESC
       `;
       let params = [];
@@ -188,8 +205,11 @@ const SalesLog = ({ showToast }) => {
       if (filterDate) {
         query = `
           SELECT i.*,
-                 COALESCE((SELECT SUM(r.amount) FROM returns r WHERE r.invoice_id = i.id), 0) AS total_returned
+                 COALESCE((SELECT SUM(r.amount) FROM returns r WHERE r.invoice_id = i.id), 0) AS total_returned,
+                 e.name AS seller_name,
+                 e.commission_rate
           FROM invoices i
+          LEFT JOIN employees e ON i.seller_id = e.id
           WHERE date(i.created_at) = ?
           ORDER BY i.id DESC
         `;
@@ -197,22 +217,33 @@ const SalesLog = ({ showToast }) => {
       }
 
       const results = await db.select(query, params);
-      setInvoices(results);
+      
+      let filteredResults = results;
+      if (filterStatus) {
+        filteredResults = results.filter((inv) => {
+          const status = deriveStatus(inv, inv.total_returned);
+          return status === filterStatus;
+        });
+      }
+      
+      setInvoices(filteredResults);
     } catch (err) {
-      showToast("خطأ في جلب البيانات", "error");
+      console.error(err);
+      if (showToast) showToast("خطأ في جلب البيانات", "error");
     } finally {
       setLoading(false);
     }
   };
 
-  // ─── جلب تفاصيل فاتورة كاملة ─────────────────────────────────────────────
+  // ─── جلب تفاصيل فاتورة كاملة ─────────────────────────────────────────────────
   const showDetails = async (invoice) => {
     try {
       const db = await getDb();
-
+      
       const items = await db.select(
-        `SELECT ii.*, pv.size, pv.color 
+        `SELECT ii.*, pv.size, pv.color, p.name as product_name 
          FROM invoice_items ii 
+         LEFT JOIN products p ON ii.product_id = p.id
          LEFT JOIN product_variants pv ON ii.variant_id = pv.id 
          WHERE ii.invoice_id = ?`,
         [invoice.id]
@@ -241,12 +272,12 @@ const SalesLog = ({ showToast }) => {
         (s, r) => s + (Number(r.amount) || 0),
         0
       );
+      
       const totalActualPaid = paymentHistory.reduce(
         (s, p) => s + (Number(p.amount_paid) || 0),
         0
       );
 
-      // حساب الكمية المرتجعة لكل صنف/variant
       const returnedQtyMap = {};
       returnsDetails.forEach((r) => {
         const key = `${r.product_id}-${r.variant_id ?? "null"}`;
@@ -260,25 +291,147 @@ const SalesLog = ({ showToast }) => {
         return { ...item, returned_qty: retQty, net_qty: netQty };
       });
 
+      let sellerInfo = null;
+      if (invoice.seller_id) {
+        const [seller] = await db.select(
+          "SELECT id, name, commission_rate, total_sales, phone FROM employees WHERE id = ?",
+          [invoice.seller_id]
+        );
+        sellerInfo = seller;
+      }
+
       setSelectedInvoice({
         ...invoice,
-        items,
-        itemsAfterReturn,
-        returnsDetails,
-        paymentHistory,
-        installmentPlan,
-        totalReturned,
-        totalActualPaid,
+        items: items,
+        itemsAfterReturn: itemsAfterReturn,
+        returnsDetails: returnsDetails,
+        paymentHistory: paymentHistory,
+        installmentPlan: installmentPlan,
+        totalReturned: totalReturned,
+        totalActualPaid: totalActualPaid,
+        sellerInfo: sellerInfo,
       });
+      
     } catch (err) {
-      showToast("خطأ في تحميل التفاصيل", "error");
+      console.error("Error in showDetails:", err);
+      if (showToast) showToast("خطأ في تحميل التفاصيل", "error");
     }
+  };
+
+  // ─── طباعة الفاتورة ─────────────────────────────────────────────────────
+  const printInvoice = (invoice) => {
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'absolute';
+    iframe.style.width = '0px';
+    iframe.style.height = '0px';
+    iframe.style.border = 'none';
+    document.body.appendChild(iframe);
+    
+    const html = `
+      <!DOCTYPE html>
+      <html dir="rtl">
+        <head>
+          <meta charset="UTF-8">
+          <title>فاتورة #${invoice.invoice_number}</title>
+          <style>
+            body {
+              font-family: 'Courier New', monospace;
+              margin: 0;
+              padding: 15px;
+              width: 280px;
+              margin: auto;
+              background: white;
+              color: black;
+            }
+            .header { text-align: center; margin-bottom: 15px; }
+            .header h2 { margin: 0; font-size: 16px; }
+            .divider { border-top: 1px dashed #000; margin: 8px 0; }
+            .items-table { width: 100%; border-collapse: collapse; }
+            .items-table th, .items-table td { padding: 4px 0; text-align: right; }
+            .total-row { font-weight: bold; font-size: 14px; border-top: 1px solid #000; margin-top: 5px; padding-top: 5px; }
+            .footer { text-align: center; margin-top: 12px; font-size: 10px; }
+            @media print {
+              body { margin: 0; padding: 10px; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h2>اسم المحل</h2>
+            <p style="font-size: 10px;">نظام كودينج كورنر</p>
+          </div>
+          <div class="divider"></div>
+          
+          <div style="display: flex; justify-content: space-between; font-size: 11px;">
+            <span>رقم: #${invoice.invoice_number}</span>
+            <span>${new Date().toLocaleDateString("ar-EG")}</span>
+          </div>
+          <div style="font-size: 11px;">العميل: ${invoice.customer_name || "عميل نقدي"}</div>
+          <div style="font-size: 10px;">البائع: ${invoice.seller_name || "—"}</div>
+          
+          <div class="divider"></div>
+          
+          <table class="items-table">
+            <thead>
+              <tr><th>الصنف</th><th>ق</th><th>السعر</th><th>الإجمالي</th></tr>
+            </thead>
+            <tbody>
+              ${invoice.items?.map(item => `
+                <tr>
+                  <td>${item.product_name}${item.size ? ` (${item.size})` : ''}${item.color ? ` - ${item.color}` : ''}</td>
+                  <td style="text-align: center;">${item.quantity}</td>
+                  <td style="text-align: left;">${(item.unit_price || 0).toFixed(2)}</td>
+                  <td style="text-align: left;">${((item.quantity || 0) * (item.unit_price || 0)).toFixed(2)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          
+          <div class="divider"></div>
+          
+          <div style="display: flex; justify-content: space-between;">
+            <span>الإجمالي:</span>
+            <span>${(invoice.total_before_discount || 0).toFixed(2)} ج.م</span>
+          </div>
+          ${(invoice.discount_value || 0) > 0 ? `
+            <div style="display: flex; justify-content: space-between;">
+              <span>الخصم:</span>
+              <span>- ${invoice.discount_type === "percent" 
+                ? ((invoice.total_before_discount || 0) * invoice.discount_value / 100).toFixed(2)
+                : invoice.discount_value} ج.م</span>
+            </div>
+          ` : ''}
+          
+          <div class="total-row" style="display: flex; justify-content: space-between;">
+            <span>الصافي:</span>
+            <span>${(invoice.total_after_discount || 0).toFixed(2)} ج.م</span>
+          </div>
+          
+          <div class="footer">
+            <p>شكراً لزيارتكم</p>
+          </div>
+        </body>
+      </html>
+    `;
+
+    iframe.contentDocument.open();
+    iframe.contentDocument.write(html);
+    iframe.contentDocument.close();
+    
+    setTimeout(() => {
+      iframe.contentWindow.print();
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+      }, 1000);
+    }, 100);
   };
 
   // ─── حذف فاتورة ──────────────────────────────────────────────────────────
   const confirmDelete = async () => {
-    if (!deleteModal.reason.trim())
-      return showToast("يرجى كتابة سبب الحذف", "warning");
+    if (!deleteModal.reason.trim()) {
+      if (showToast) showToast("يرجى كتابة سبب الحذف", "warning");
+      return;
+    }
     try {
       const db = await getDb();
       const inv = deleteModal.invoice;
@@ -289,7 +442,9 @@ const SalesLog = ({ showToast }) => {
       const snapshot = JSON.stringify({ items });
 
       await db.execute(
-        "INSERT INTO deleted_invoices (invoice_id, invoice_number, customer_name, total_amount, reason, items_json) VALUES (?, ?, ?, ?, ?, ?)",
+        `INSERT INTO deleted_invoices 
+         (invoice_id, invoice_number, customer_name, total_amount, reason, items_json, deleted_at) 
+         VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`,
         [
           inv.id,
           inv.invoice_number,
@@ -301,55 +456,152 @@ const SalesLog = ({ showToast }) => {
       );
 
       for (const item of items) {
-        await db.execute("UPDATE products SET stock = stock + ? WHERE id = ?", [
-          item.quantity,
-          item.product_id,
-        ]);
+        if (item.variant_id) {
+          await db.execute("UPDATE product_variants SET stock = stock + ? WHERE id = ?", [
+            item.quantity,
+            item.variant_id,
+          ]);
+        } else {
+          await db.execute("UPDATE products SET stock = stock + ? WHERE id = ?", [
+            item.quantity,
+            item.product_id,
+          ]);
+        }
       }
+      
       await db.execute("DELETE FROM invoice_items WHERE invoice_id = ?", [inv.id]);
       await db.execute("DELETE FROM invoices WHERE id = ?", [inv.id]);
 
-      showToast("تم الحذف بنجاح", "success");
+      if (showToast) showToast("تم الحذف بنجاح", "success");
       setDeleteModal({ show: false, invoice: null, reason: "" });
       fetchInvoices();
     } catch (err) {
-      showToast("خطأ في التنفيذ", "error");
+      console.error(err);
+      if (showToast) showToast("خطأ في التنفيذ", "error");
     }
   };
 
   const closeModal = () => setSelectedInvoice(null);
+  const closeEditModal = () => {
+    setShowEditModal(false);
+    setEditInvoiceId(null);
+    fetchInvoices();
+  };
+
+  const openEditModal = (invoice) => {
+    setEditInvoiceId(invoice.id);
+    setShowEditModal(true);
+    closeModal();
+  };
 
   const filtered = invoices.filter(
     (inv) =>
       (inv.invoice_number || "").includes(searchTerm) ||
-      (inv.customer_name || "").includes(searchTerm)
+      (inv.customer_name || "").includes(searchTerm) ||
+      (inv.seller_name || "").includes(searchTerm)
   );
 
-  // ─── Render ───────────────────────────────────────────────────────────────
+  const stats = {
+    total: invoices.reduce((sum, inv) => sum + (inv.total_after_discount || 0), 0),
+    count: invoices.length,
+    completed: invoices.filter(inv => deriveStatus(inv, inv.total_returned) === "completed").length,
+    pending: invoices.filter(inv => inv.status === "pending").length,
+    returned: invoices.filter(inv => deriveStatus(inv, inv.total_returned) === "returned").length,
+  };
+
+  useEffect(() => {
+    fetchInvoices();
+    
+    const handleStorageChange = (e) => {
+      if (e.key === 'invoices_updated' || e.key === 'invoice_updated') {
+        console.log("📢 Detected invoice update, refreshing...");
+        fetchInvoices();
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [filterDate, filterStatus]);
+
   return (
     <div className="page-container animate-fade-in" dir="rtl">
+
+      {/* إحصائيات سريعة */}
+      <div className="stats-grid-premium" style={{ marginBottom: "20px" }}>
+        <div className="stat-card-premium emerald">
+          <div className="stat-icon-wrapper"><DollarSign size={24} /></div>
+          <div>
+            <div className="stat-label">إجمالي المبيعات</div>
+            <div className="stat-value">{stats.total.toLocaleString()} ج.م</div>
+          </div>
+        </div>
+        <div className="stat-card-premium indigo">
+          <div className="stat-icon-wrapper"><FileText size={24} /></div>
+          <div>
+            <div className="stat-label">عدد الفواتير</div>
+            <div className="stat-value">{stats.count}</div>
+          </div>
+        </div>
+        <div className="stat-card-premium green">
+          <div className="stat-icon-wrapper"><CheckCircle2 size={24} /></div>
+          <div>
+            <div className="stat-label">مكتملة</div>
+            <div className="stat-value">{stats.completed}</div>
+          </div>
+        </div>
+        <div className="stat-card-premium amber">
+          <div className="stat-icon-wrapper"><Clock size={24} /></div>
+          <div>
+            <div className="stat-label">معلقة</div>
+            <div className="stat-value">{stats.pending}</div>
+          </div>
+        </div>
+      </div>
 
       {/* Header */}
       <div className="page-header-container">
         <div className="header-title-section">
           <h2 className="main-title">سجل المبيعات</h2>
-          <p className="sub-title">إدارة الفواتير والتحصيلات المالية</p>
+          <p className="sub-title">إدارة الفواتير والتحصيلات المالية وتتبع الأداء</p>
         </div>
-        <div className="header-actions-group">
+        <div className="header-actions-group" style={{ gap: "12px", flexWrap: "wrap" }}>
           <input
             type="date"
             value={filterDate}
             onChange={(e) => setFilterDate(e.target.value)}
             className="premium-select"
+            style={{ padding: "10px" }}
           />
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="premium-select"
+            style={{ padding: "10px" }}
+          >
+            <option value="">كل الحالات</option>
+            <option value="completed">مكتملة</option>
+            <option value="pending">معلقة</option>
+            <option value="partial_returned">مرتجع جزئي</option>
+            <option value="returned">مرتجع كلي</option>
+          </select>
+          <button 
+            onClick={() => fetchInvoices()}
+            className="btn-secondary"
+            style={{ display: "flex", alignItems: "center", gap: "6px", padding: "10px 16px" }}
+          >
+            <RotateCcw size={16} /> تحديث
+          </button>
           <div style={{ position: "relative" }}>
             <input
               type="text"
-              placeholder="بحث..."
+              placeholder="بحث برقم الفاتورة أو العميل أو البائع..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="premium-select"
-              style={{ width: "250px", paddingRight: "35px" }}
+              style={{ width: "280px", paddingRight: "35px" }}
             />
             <Search
               size={16}
@@ -366,6 +618,7 @@ const SalesLog = ({ showToast }) => {
             <tr>
               <th>رقم الفاتورة</th>
               <th>العميل</th>
+              <th>البائع</th>
               <th>نظام الدفع</th>
               <th>الإجمالي</th>
               <th>الحالة</th>
@@ -375,9 +628,9 @@ const SalesLog = ({ showToast }) => {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan="7" className="text-center">جاري التحميل...</td></tr>
+              <tr><td colSpan="8" className="text-center">جاري التحميل...</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan="7" className="text-center">لا توجد فواتير</td></tr>
+              <tr><td colSpan="8" className="text-center">لا توجد فواتير</td></tr>
             ) : (
               filtered.map((inv) => {
                 const pmConfig = PAYMENT_MAP[inv.payment_method] || PAYMENT_MAP.cash;
@@ -387,7 +640,18 @@ const SalesLog = ({ showToast }) => {
                 return (
                   <tr key={inv.id} className="table-row">
                     <td><span className="id-badge">#{inv.invoice_number}</span></td>
-                    <td>{inv.customer_name || "عميل نقدي"}</td>
+                    <td style={{ fontWeight: "500" }}>{inv.customer_name || "عميل نقدي"}</td>
+                    <td>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        <User size={14} style={{ color: "#64748b" }} />
+                        <span>{inv.seller_name || "—"}</span>
+                        {inv.commission_rate > 0 && (
+                          <span style={{ fontSize: "11px", color: "#10b981" }}>
+                            ({inv.commission_rate}%)
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td>
                       <Badge
                         {...pmConfig}
@@ -407,6 +671,9 @@ const SalesLog = ({ showToast }) => {
                       <button className="action-btn edit" onClick={() => showDetails(inv)}>
                         <Eye size={18} />
                       </button>
+                      <button className="action-btn edit" onClick={() => openEditModal(inv)}>
+                        <Edit size={18} />
+                      </button>
                       <button
                         className="action-btn delete"
                         onClick={() => setDeleteModal({ show: true, invoice: inv, reason: "" })}
@@ -422,18 +689,10 @@ const SalesLog = ({ showToast }) => {
         </table>
       </div>
 
-      {/* ═══════════════════════════════════════════════════════════════════════
-          مودال التفاصيل
-      ══════════════════════════════════════════════════════════════════════════ */}
+      {/* مودال التفاصيل */}
       {selectedInvoice && (
-        <div
-          className="modal-overlay"
-          onClick={(e) => e.target.className === "modal-overlay" && closeModal()}
-        >
-          <div
-            className="modal-content-premium"
-            style={{ maxWidth: "960px", width: "95%" }}
-          >
+        <div className="modal-overlay" onClick={(e) => e.target.className === "modal-overlay" && closeModal()}>
+          <div className="modal-content-premium" style={{ maxWidth: "1100px", width: "95%", maxHeight: "90vh", overflow: "hidden" }}>
             <div className="modal-header">
               <h3>
                 <Receipt size={18} style={{ display: "inline", marginLeft: "8px" }} />
@@ -441,193 +700,169 @@ const SalesLog = ({ showToast }) => {
               </h3>
             </div>
 
-            <div
-              className="premium-form"
-              style={{
-                padding: "20px",
-                maxHeight: "82vh",
-                overflowY: "auto",
-                display: "flex",
-                flexDirection: "column",
-                gap: "20px",
-              }}
-            >
-
-              {/* ── بيانات العميل + الفاتورة ── */}
+            <div style={{ padding: "20px", maxHeight: "calc(90vh - 80px)", overflowY: "auto", display: "flex", flexDirection: "column", gap: "20px" }}>
+              {/* بيانات العميل + الفاتورة + البائع */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-
                 <SectionBox>
-                  <SectionTitle label="بيانات العميل" />
-                  <InfoRow icon={<User size={15} />} label="الاسم"
-                    value={selectedInvoice.customer_name || "عميل نقدي"} />
-                  <InfoRow icon={<Phone size={15} />} label="التليفون"
-                    value={selectedInvoice.customer_phone || "—"} />
-                  <InfoRow icon={<MapPin size={15} />} label="العنوان"
-                    value={selectedInvoice.customer_address || "—"} />
+                  <SectionTitle label="بيانات العميل" icon={<User size={14} />} />
+                  <InfoRow icon={<User size={15} />} label="الاسم" value={selectedInvoice.customer_name || "عميل نقدي"} />
+                  <InfoRow icon={<Phone size={15} />} label="التليفون" value={selectedInvoice.customer_phone || "—"} />
+                  <InfoRow icon={<MapPin size={15} />} label="العنوان" value={selectedInvoice.customer_address || "—"} />
                 </SectionBox>
 
                 <SectionBox>
-                  <SectionTitle label="بيانات الفاتورة" />
-                  <InfoRow
-                    icon={<Calendar size={15} />}
-                    label="التاريخ"
-                    value={new Date(selectedInvoice.created_at).toLocaleDateString("ar-EG", {
-                      year: "numeric", month: "long", day: "numeric",
-                    })}
-                  />
-                  <InfoRow
-                    icon={<HandCoins size={15} />}
-                    label="نظام الدفع"
-                    value={
-                      <Badge
-                        {...(PAYMENT_MAP[selectedInvoice.payment_method] || PAYMENT_MAP.cash)}
-                        label={
-                          selectedInvoice.payment_method === "installment"
-                            ? `تقسيط (${selectedInvoice.installments_count} قسط)`
-                            : (PAYMENT_MAP[selectedInvoice.payment_method] || PAYMENT_MAP.cash).label
-                        }
-                      />
-                    }
-                  />
-                  <InfoRow
-                    icon={<Tag size={15} />}
-                    label="الحالة"
-                    value={
-                      <Badge
-                        {...(STATUS_MAP[deriveStatus(selectedInvoice, selectedInvoice.totalReturned)]
-                          || STATUS_MAP.completed)}
-                      />
-                    }
-                  />
+                  <SectionTitle label="بيانات الفاتورة" icon={<FileText size={14} />} />
+                  <InfoRow icon={<Calendar size={15} />} label="التاريخ" value={new Date(selectedInvoice.created_at).toLocaleDateString("ar-EG")} />
+                  <InfoRow icon={<HandCoins size={15} />} label="نظام الدفع" value={<Badge {...(PAYMENT_MAP[selectedInvoice.payment_method] || PAYMENT_MAP.cash)} label={selectedInvoice.payment_method === "installment" ? `تقسيط (${selectedInvoice.installments_count} قسط)` : (PAYMENT_MAP[selectedInvoice.payment_method] || PAYMENT_MAP.cash).label} />} />
+                  <InfoRow icon={<Tag size={15} />} label="الحالة" value={<Badge {...(STATUS_MAP[deriveStatus(selectedInvoice, selectedInvoice.totalReturned)] || STATUS_MAP.completed)} />} />
+                  <InfoRow icon={<Users size={15} />} label="البائع" value={<span>{selectedInvoice.seller_name || selectedInvoice.sellerInfo?.name || "—"}</span>} />
                 </SectionBox>
               </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                <SectionBox>
+                  <SectionTitle label="الملخص المالي" icon={<DollarSign size={14} />} />
+                  <InfoRow icon={<Receipt size={15} />} label="إجمالي قبل الخصم" value={`${(selectedInvoice.total_before_discount || 0).toLocaleString()} ج.م`} />
+                  {(selectedInvoice.discount_value || 0) > 0 && (
+                    <InfoRow icon={<Percent size={15} />} label={selectedInvoice.discount_type === "percent" ? `خصم ${selectedInvoice.discount_value}%` : "خصم (مبلغ ثابت)"} value={`- ${selectedInvoice.discount_type === "percent" ? ((selectedInvoice.total_before_discount || 0) * selectedInvoice.discount_value) / 100 : selectedInvoice.discount_value} ج.م`} valueStyle={{ color: "#f87171" }} />
+                  )}
+                  
+                  <InfoRow icon={<CheckCircle2 size={15} />} label="إجمالي بعد الخصم" value={`${(selectedInvoice.total_after_discount || 0).toLocaleString()} ج.م`} valueStyle={{ color: "#34d399" }} />
+                    <InfoRow icon={<CheckCircle2 size={15} />} label="صافي المحصل" value={`${Math.max(0, (selectedInvoice.total_after_discount || 0) - (selectedInvoice.totalReturned || 0)).toLocaleString()} ج.م`} valueStyle={{ color: "#34d399", fontSize: "16px" }} />
+                  {(selectedInvoice.totalReturned || 0) > 0 && (
+                    <InfoRow icon={<RotateCcw size={15} />} label="إجمالي المرتجعات" value={`- ${(selectedInvoice.totalReturned || 0).toLocaleString()} ج.م`} valueStyle={{ color: "#fb923c" }} />
+                  )}
+                  <div style={{ height: "1px", background: "rgba(255,255,255,0.08)", margin: "8px 0" }} />
+                  
+                  {/* عرض تفاصيل الدفع حسب نوعه */}
+                </SectionBox>
+                <SectionBox>
+                  <SectionTitle label="تفاصيل الدفع للاقساط" icon={<DollarSign size={14} />} />
+                  {selectedInvoice.payment_method === "installment" ? (
+                    <>
+                      <InfoRow 
+                        icon={<Wallet size={15} />} 
+                        label="المبلغ المدفوع (مقدم)" 
+                        value={`${(selectedInvoice.paid_amount || 0).toLocaleString()} ج.م`} 
+                        valueStyle={{ color: "#34d399" }} 
+                      />
+                      <InfoRow 
+                        icon={<AlertCircle size={15} />} 
+                        label="المتبقي على العميل" 
+                        value={`${Math.max(0, (selectedInvoice.total_after_discount || 0) - (selectedInvoice.paid_amount || 0) - (selectedInvoice.totalReturned || 0)).toLocaleString()} ج.م`} 
+                        valueStyle={{ color: "#f97316", fontSize: "16px" }} 
+                      />
+                      <InfoRow 
+                        icon={<Repeat size={15} />} 
+                        label="عدد الأقساط المتبقية" 
+                        value={`${selectedInvoice.installments_count || 0} قسط`} 
+                        valueStyle={{ color: "#60a5fa" }} 
+                      />
+                      <InfoRow 
+                        icon={<CheckCircle2 size={15} />} 
+                        label="إجمالي المحصل" 
+                        value={`${(selectedInvoice.totalActualPaid || 0).toLocaleString()} ج.م`} 
+                        valueStyle={{ color: "#34d399" }} 
+                      />
+                      {
+                        console.log("تفاصيل الدفع:", {
+                          selectedInvoice
+                        })
+                      }
 
-              {/* ── الملخص المالي ── */}
-              <SectionBox>
-                <SectionTitle label="الملخص المالي" />
+                    </>
+                  ) : (
+                    <InfoRow icon={<CheckCircle2 size={15} />} label="صافي المحصل" value={`${Math.max(0, (selectedInvoice.total_after_discount || 0) - (selectedInvoice.totalReturned || 0)).toLocaleString()} ج.م`} valueStyle={{ color: "#34d399", fontSize: "16px" }} />
+                  )}
+                </SectionBox>
+              </div>  
+              {/* الملخص المالي */}
 
-                <InfoRow
-                  icon={<Receipt size={15} />}
-                  label="إجمالي قبل الخصم"
-                  value={`${(selectedInvoice.total_before_discount || 0).toLocaleString()} ج.م`}
-                />
-
-                {(selectedInvoice.discount_value || 0) > 0 && (
-                  <InfoRow
-                    icon={<Percent size={15} />}
-                    label={
-                      selectedInvoice.discount_type === "percent"
-                        ? `خصم ${selectedInvoice.discount_value}%`
-                        : "خصم (مبلغ ثابت)"
-                    }
-                    value={`- ${(
-                      selectedInvoice.discount_type === "percent"
-                        ? ((selectedInvoice.total_before_discount || 0) * selectedInvoice.discount_value) / 100
-                        : selectedInvoice.discount_value
-                    ).toLocaleString()} ج.م`}
-                    valueStyle={{ color: "#f87171" }}
-                  />
-                )}
-
-                <InfoRow
-                  icon={<CheckCircle2 size={15} />}
-                  label="إجمالي بعد الخصم"
-                  value={`${(selectedInvoice.total_after_discount || 0).toLocaleString()} ج.م`}
-                  valueStyle={{ color: "#34d399", fontSize: "15px" }}
-                />
-
-                {(selectedInvoice.totalReturned || 0) > 0 && (
-                  <InfoRow
-                    icon={<RotateCcw size={15} />}
-                    label="إجمالي المرتجعات"
-                    value={`- ${(selectedInvoice.totalReturned || 0).toLocaleString()} ج.م`}
-                    valueStyle={{ color: "#fb923c" }}
-                  />
-                )}
-
-                <div style={{ height: "1px", background: "rgba(255,255,255,0.08)", margin: "8px 0" }} />
-
-                {selectedInvoice.payment_method === "installment" ? (
-                  <>
-                    <InfoRow
-                      icon={<HandCoins size={15} />}
-                      label="مقدم عند التعاقد"
-                      value={`${(selectedInvoice.paid_amount || 0).toLocaleString()} ج.م`}
-                      valueStyle={{ color: "#34d399" }}
-                    />
-                    <InfoRow
-                      icon={<Repeat size={15} />}
-                      label="أقساط محصلة لاحقاً"
-                      value={`${Math.max(
-                        0,
-                        (selectedInvoice.totalActualPaid || 0) - (selectedInvoice.paid_amount || 0)
-                      ).toLocaleString()} ج.م`}
-                      valueStyle={{ color: "#60a5fa" }}
-                    />
-                    <InfoRow
-                      icon={<AlertCircle size={15} />}
-                      label="المتبقي النهائي"
-                      value={`${Math.max(
-                        0,
-                        (selectedInvoice.total_after_discount || 0)
-                          - (selectedInvoice.totalActualPaid || 0)
-                          - (selectedInvoice.totalReturned || 0)
-                      ).toLocaleString()} ج.م`}
-                      valueStyle={{ color: "#f97316", fontSize: "16px" }}
-                    />
-                  </>
-                ) : (
-                  <InfoRow
-                    icon={<CheckCircle2 size={15} />}
-                    label="صافي المحصل"
-                    value={`${Math.max(
-                      0,
-                      (selectedInvoice.total_after_discount || 0) - (selectedInvoice.totalReturned || 0)
-                    ).toLocaleString()} ج.م`}
-                    valueStyle={{ color: "#34d399", fontSize: "16px" }}
-                  />
-                )}
-              </SectionBox>
-
-              {/* ── الأصناف المشتراة ── */}
-              <div>
-                <SectionTitle label="الأصناف المشتراة" />
-                <div className="table-wrapper-premium"
-                  style={{ boxShadow: "none", border: "1px solid rgba(255,255,255,0.08)" }}>
-                  <table className="custom-table">
-                    <thead>
-                      <tr>
-                        <th>الصنف</th>
-                        <th>المقاس / اللون</th>
-                        <th>الكمية</th>
-                        <th>سعر الوحدة</th>
-                        <th>الإجمالي</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selectedInvoice.items.map((item) => (
-                        <tr key={item.id}>
-                          <td>{item.product_name}</td>
-                          <td>{item.size || "—"} / {item.color || "—"}</td>
-                          <td>{item.quantity}</td>
-                          <td>{(item.unit_price || 0).toLocaleString()} ج.م</td>
-                          <td className="bold-text">
-                            {((item.quantity || 0) * (item.unit_price || 0)).toLocaleString()} ج.م
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* ── الأصناف المرتجعة (تظهر فقط لو في مرتجعات) ── */}
-              {selectedInvoice.returnsDetails.length > 0 && (
+              {/* جدول الأقساط - يظهر فقط للتقسيط */}
+              {selectedInvoice.payment_method === "installment" && selectedInvoice.installmentPlan && selectedInvoice.installmentPlan.length > 0 && (
                 <div>
-                  <SectionTitle label="الأصناف المرتجعة" color="#fb923c" />
-                  <div className="table-wrapper-premium"
-                    style={{ boxShadow: "none", border: "1px solid rgba(251,146,60,0.3)" }}>
-                    <table className="custom-table">
+                  <SectionTitle label="جدول الأقساط" color="#f97316" icon={<CalendarDays size={14} />} />
+                  <div className="table-wrapper-premium" style={{ boxShadow: "none", border: "1px solid rgba(249,115,22,0.3)" }}>
+                    <table className="custom-table" style={{ fontSize: "13px" }}>
+                      <thead>
+                        <tr>
+                          <th>#</th>
+                          <th>تاريخ الاستحقاق</th>
+                          <th>المبلغ المطلوب</th>
+                          <th>المبلغ المدفوع</th>
+                          <th>الحالة</th>
+                          <th>تاريخ الدفع</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedInvoice.installmentPlan.map((plan, idx) => {
+                          const payment = selectedInvoice.paymentHistory?.find(p => 
+                            new Date(p.payment_date).toDateString() === new Date(plan.due_date).toDateString()
+                          );
+                          const isPaid = plan.status === "paid" || payment;
+                          return (
+                            <tr key={plan.id}>
+                              <td style={{ color: "#94a3b8" }}>{idx + 1}</td>
+                              <td>{new Date(plan.due_date).toLocaleDateString("ar-EG")}</td>
+                              <td style={{ fontWeight: "700" }}>{(plan.amount_due || 0).toLocaleString()} ج.م</td>
+                              <td style={{ color: isPaid ? "#34d399" : "#94a3b8" }}>
+                                {isPaid ? (payment?.amount_paid || plan.amount_due || 0).toLocaleString() : "—"} ج.م
+                              </td>
+                              <td>
+                                {isPaid ? (
+                                  <Badge bg="#dcfce7" text="#166534" border="#bbf7d0" icon={<CheckCircle2 size={12} />} label="مدفوع" />
+                                ) : (
+                                  <Badge bg="#fef3c7" text="#92400e" border="#fde68a" icon={<AlertCircle size={12} />} label="معلق" />
+                                )}
+                              </td>
+                              <td style={{ fontSize: "12px", color: "#64748b" }}>
+                                {payment ? new Date(payment.payment_date).toLocaleDateString("ar-EG") : "—"}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* الأصناف المشتراة */}
+              {selectedInvoice.items && selectedInvoice.items.length > 0 && (
+                <div>
+                  <SectionTitle label="الأصناف المشتراة" icon={<Package size={14} />} />
+                  <div className="table-wrapper-premium" style={{ boxShadow: "none", border: "1px solid rgba(255,255,255,0.08)" }}>
+                    <table className="custom-table" style={{ fontSize: "13px" }}>
+                      <thead>
+                        <tr>
+                          <th>الصنف</th>
+                          <th>المقاس / اللون</th>
+                          <th>الكمية</th>
+                          <th>سعر الوحدة</th>
+                          <th>الإجمالي</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedInvoice.items.map((item) => (
+                          <tr key={item.id}>
+                            <td>{item.product_name}</td>
+                            <td>{item.size || "—"} / {item.color || "—"}</td>
+                            <td>{item.quantity}</td>
+                            <td>{(item.unit_price || 0).toLocaleString()} ج.م</td>
+                            <td className="bold-text">{((item.quantity || 0) * (item.unit_price || 0)).toLocaleString()} ج.م</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* الأصناف المرتجعة */}
+              {selectedInvoice.returnsDetails && selectedInvoice.returnsDetails.length > 0 && (
+                <div>
+                  <SectionTitle label="الأصناف المرتجعة" color="#fb923c" icon={<RotateCcw size={14} />} />
+                  <div className="table-wrapper-premium" style={{ boxShadow: "none", border: "1px solid rgba(251,146,60,0.3)" }}>
+                    <table className="custom-table" style={{ fontSize: "13px" }}>
                       <thead>
                         <tr>
                           <th>الصنف</th>
@@ -653,141 +888,13 @@ const SalesLog = ({ showToast }) => {
                 </div>
               )}
 
-              {/* ── الأصناف بعد المرتجع (تظهر فقط لو في مرتجعات) ── */}
-              {selectedInvoice.returnsDetails.length > 0 && (
-                <div>
-                  <SectionTitle label="الأصناف الصافية بعد الرجع" color="#34d399" />
-                  <div className="table-wrapper-premium"
-                    style={{ boxShadow: "none", border: "1px solid rgba(52,211,153,0.25)" }}>
-                    <table className="custom-table">
-                      <thead>
-                        <tr>
-                          <th>الصنف</th>
-                          <th>المقاس / اللون</th>
-                          <th>الكمية الأصلية</th>
-                          <th>المرتجع</th>
-                          <th>الصافي</th>
-                          <th>القيمة الصافية</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {selectedInvoice.itemsAfterReturn.map((item) => (
-                          <tr key={item.id}>
-                            <td>{item.product_name}</td>
-                            <td>{item.size || "—"} / {item.color || "—"}</td>
-                            <td>{item.quantity}</td>
-                            <td style={{ color: "#fb923c" }}>
-                              {item.returned_qty > 0 ? item.returned_qty : "—"}
-                            </td>
-                            <td className="bold-text"
-                              style={{ color: item.net_qty === 0 ? "#f87171" : "#34d399" }}>
-                              {item.net_qty}
-                            </td>
-                            <td className="bold-text">
-                              {(item.net_qty * (item.unit_price || 0)).toLocaleString()} ج.م
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {/* ── بيانات الأقساط الكاملة (تظهر فقط في التقسيط) ── */}
-              {selectedInvoice.payment_method === "installment" && (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-
-                  {/* سجل التحصيلات */}
-                  <div>
-                    <SectionTitle label="سجل التحصيلات" color="#34d399" />
-                    <div className="table-wrapper-premium"
-                      style={{ boxShadow: "none", border: "1px solid rgba(52,211,153,0.25)" }}>
-                      <table className="custom-table" style={{ fontSize: "12px" }}>
-                        <thead>
-                          <tr>
-                            <th>التاريخ</th>
-                            <th>المبلغ</th>
-                            <th>طريقة الدفع</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {selectedInvoice.paymentHistory.length === 0 ? (
-                            <tr>
-                              <td colSpan="3" style={{ textAlign: "center", color: "#94a3b8" }}>
-                                لا توجد تحصيلات بعد
-                              </td>
-                            </tr>
-                          ) : (
-                            selectedInvoice.paymentHistory.map((p) => (
-                              <tr key={p.id}>
-                                <td>{new Date(p.payment_date).toLocaleDateString("ar-EG")}</td>
-                                <td style={{ color: "#34d399", fontWeight: "700" }}>
-                                  {(p.amount_paid || 0).toLocaleString()} ج.م
-                                </td>
-                                <td>
-                                  <Badge {...(PAYMENT_MAP[p.payment_method] || PAYMENT_MAP.cash)} />
-                                </td>
-                              </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* جدول مواعيد الأقساط */}
-                  <div>
-                    <SectionTitle label="جدول مواعيد الأقساط" color="#f97316" />
-                    <div className="table-wrapper-premium"
-                      style={{ boxShadow: "none", border: "1px solid rgba(249,115,22,0.25)" }}>
-                      <table className="custom-table" style={{ fontSize: "12px" }}>
-                        <thead>
-                          <tr>
-                            <th>#</th>
-                            <th>الموعد</th>
-                            <th>المبلغ</th>
-                            <th>الحالة</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {selectedInvoice.installmentPlan.length === 0 ? (
-                            <tr>
-                              <td colSpan="4" style={{ textAlign: "center", color: "#94a3b8" }}>
-                                لا يوجد جدول أقساط
-                              </td>
-                            </tr>
-                          ) : (
-                            selectedInvoice.installmentPlan.map((p, idx) => (
-                              <tr key={p.id}>
-                                <td style={{ color: "#94a3b8" }}>{idx + 1}</td>
-                                <td>{new Date(p.due_date).toLocaleDateString("ar-EG")}</td>
-                                <td style={{ fontWeight: "700" }}>
-                                  {(p.amount_due || 0).toLocaleString()} ج.م
-                                </td>
-                                <td>
-                                  {p.status === "paid" ? (
-                                    <Badge bg="#dcfce7" text="#166534" border="#bbf7d0"
-                                      icon={<CheckCircle2 size={12} />} label="مدفوع" />
-                                  ) : (
-                                    <Badge bg="#fef3c7" text="#92400e" border="#fde68a"
-                                      icon={<AlertCircle size={12} />} label="معلق" />
-                                  )}
-                                </td>
-                              </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {/* Footer */}
               <div className="modal-footer">
-                <button className="btn-save flex-1" onClick={() => window.print()}>
+                <button className="btn-save flex-1" onClick={() => printInvoice(selectedInvoice)}>
                   <Printer size={18} /> طباعة
+                </button>
+                <button className="btn-save flex-1" onClick={() => openEditModal(selectedInvoice)}>
+                  <Edit size={18} /> تعديل
                 </button>
                 <button className="btn-cancel" onClick={closeModal}>إغلاق</button>
               </div>
@@ -796,9 +903,24 @@ const SalesLog = ({ showToast }) => {
         </div>
       )}
 
-      {/* ═══════════════════════════════════════════════════════════════════════
-          مودال الحذف
-      ══════════════════════════════════════════════════════════════════════════ */}
+      {/* مودال تعديل الفاتورة */}
+      {showEditModal && editInvoiceId && (
+        <div className="modal-overlay" onClick={closeEditModal}>
+          <div 
+            className="modal-content-premium" 
+            style={{ maxWidth: "95%", width: "95%", maxHeight: "90vh", overflow: "auto", padding: "0" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <EditBill 
+              invoiceId={editInvoiceId} 
+              onBack={closeEditModal} 
+              showToast={showToast} 
+            />
+          </div>
+        </div>
+      )}
+
+      {/* مودال الحذف */}
       {deleteModal.show && (
         <div className="modal-overlay">
           <div className="modal-content-premium" style={{ maxWidth: "400px" }}>
@@ -816,8 +938,7 @@ const SalesLog = ({ showToast }) => {
                 <button className="btn-save" style={{ background: "#ef4444" }} onClick={confirmDelete}>
                   تأكيد الحذف
                 </button>
-                <button className="btn-cancel"
-                  onClick={() => setDeleteModal({ show: false, invoice: null, reason: "" })}>
+                <button className="btn-cancel" onClick={() => setDeleteModal({ show: false, invoice: null, reason: "" })}>
                   إلغاء
                 </button>
               </div>
@@ -825,7 +946,6 @@ const SalesLog = ({ showToast }) => {
           </div>
         </div>
       )}
-
     </div>
   );
 };
