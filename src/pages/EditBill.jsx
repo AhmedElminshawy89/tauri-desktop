@@ -24,18 +24,30 @@ import {
   Eye,
   LogOut,
   Users,
+  Clock,
 } from "lucide-react";
 
 /* ─────────────────────────────────────────
    Editable Cell
 ───────────────────────────────────────── */
-const EditableCell = ({ value, onSave, type = "text", style = {}, minValue, showToast }) => {
+const EditableCell = ({
+  value,
+  onSave,
+  type = "text",
+  style = {},
+  minValue,
+  showToast,
+}) => {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(value);
   const ref = useRef();
 
-  useEffect(() => { setVal(value); }, [value]);
-  useEffect(() => { if (editing) ref.current?.select(); }, [editing]);
+  useEffect(() => {
+    setVal(value);
+  }, [value]);
+  useEffect(() => {
+    if (editing) ref.current?.select();
+  }, [editing]);
 
   const commit = () => {
     setEditing(false);
@@ -60,13 +72,21 @@ const EditableCell = ({ value, onSave, type = "text", style = {}, minValue, show
         onBlur={commit}
         onKeyDown={(e) => {
           if (e.key === "Enter") commit();
-          if (e.key === "Escape") { setVal(value); setEditing(false); }
+          if (e.key === "Escape") {
+            setVal(value);
+            setEditing(false);
+          }
         }}
       />
     );
 
   return (
-    <span className="ei-editable-cell" style={style} onClick={() => setEditing(true)} title="اضغط للتعديل">
+    <span
+      className="ei-editable-cell"
+      style={style}
+      onClick={() => setEditing(true)}
+      title="اضغط للتعديل"
+    >
       {value}
       <span className="ei-pencil">✎</span>
     </span>
@@ -76,7 +96,17 @@ const EditableCell = ({ value, onSave, type = "text", style = {}, minValue, show
 /* ─────────────────────────────────────────
    Customer Field with autocomplete
 ───────────────────────────────────────── */
-const CustomerField = ({ icon, label, value, onChange, suggestions = [], onSelectSuggestion, type = "text", placeholder, onAddNew }) => {
+const CustomerField = ({
+  icon,
+  label,
+  value,
+  onChange,
+  suggestions = [],
+  onSelectSuggestion,
+  type = "text",
+  placeholder,
+  onAddNew,
+}) => {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef();
 
@@ -85,7 +115,9 @@ const CustomerField = ({ icon, label, value, onChange, suggestions = [], onSelec
   }, [suggestions]);
 
   useEffect(() => {
-    const handler = (e) => { if (!wrapRef.current?.contains(e.target)) setOpen(false); };
+    const handler = (e) => {
+      if (!wrapRef.current?.contains(e.target)) setOpen(false);
+    };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
@@ -108,16 +140,37 @@ const CustomerField = ({ icon, label, value, onChange, suggestions = [], onSelec
         {open && suggestions.length > 0 && (
           <div className="ei-suggestions">
             {suggestions.map((c, i) => (
-              <div key={i} className="ei-suggestion-item" onClick={() => { onSelectSuggestion?.(c); setOpen(false); }}>
+              <div
+                key={i}
+                className="ei-suggestion-item"
+                onClick={() => {
+                  onSelectSuggestion?.(c);
+                  setOpen(false);
+                }}
+              >
                 <div className="ei-suggestion-name">{c.customer_name}</div>
                 <div className="ei-suggestion-meta">
-                  {c.customer_phone && <span><Phone size={10}/> {c.customer_phone}</span>}
-                  {c.customer_address && <span><MapPin size={10}/> {c.customer_address}</span>}
+                  {c.customer_phone && (
+                    <span>
+                      <Phone size={10} /> {c.customer_phone}
+                    </span>
+                  )}
+                  {c.customer_address && (
+                    <span>
+                      <MapPin size={10} /> {c.customer_address}
+                    </span>
+                  )}
                 </div>
               </div>
             ))}
-            <div className="ei-suggestion-new" onClick={() => { onAddNew?.(); setOpen(false); }}>
-              <Sparkles size={11}/> تسجيل عميل جديد بهذا الاسم
+            <div
+              className="ei-suggestion-new"
+              onClick={() => {
+                onAddNew?.();
+                setOpen(false);
+              }}
+            >
+              <Sparkles size={11} /> تسجيل عميل جديد بهذا الاسم
             </div>
           </div>
         )}
@@ -130,41 +183,50 @@ const CustomerField = ({ icon, label, value, onChange, suggestions = [], onSelec
    Main Page
 ───────────────────────────────────────── */
 const EditBill = ({ invoiceId: initialInvoiceId, onBack, showToast }) => {
-  const [invoiceInput, setInvoiceInput] = useState(initialInvoiceId ? String(initialInvoiceId) : "");
-  const [activeInvoiceId, setActiveInvoiceId] = useState(initialInvoiceId ?? null);
+  const [invoiceInput, setInvoiceInput] = useState(
+    initialInvoiceId ? String(initialInvoiceId) : ""
+  );
+  const [activeInvoiceId, setActiveInvoiceId] = useState(
+    initialInvoiceId ?? null
+  );
   const invoiceInputRef = useRef();
 
   const handleLookup = async () => {
     const val = invoiceInput.trim();
-    if (!val) { 
-      showToast?.("أدخل رقم الفاتورة", "error"); 
-      return; 
+    if (!val) {
+      showToast?.("أدخل رقم الفاتورة", "error");
+      return;
     }
     try {
       const db = await getDb();
-      // البحث فقط في invoice_number وليس في id
       const rows = await db.select(
-        "SELECT id FROM invoices WHERE invoice_number = $1 LIMIT 1", 
+        "SELECT id FROM invoices WHERE invoice_number = $1 LIMIT 1",
         [val]
       );
-      if (!rows.length) { 
-        showToast?.(`الفاتورة رقم "${val}" غير موجودة`, "error"); 
-        return; 
+      if (!rows.length) {
+        showToast?.(`الفاتورة رقم "${val}" غير موجودة`, "error");
+        return;
       }
       setActiveInvoiceId(rows[0].id);
-    } catch (e) { 
-      showToast?.("خطأ في البحث: " + e.message, "error"); 
+    } catch (e) {
+      showToast?.("خطأ في البحث: " + e.message, "error");
     }
   };
 
   /* ── State ── */
   const [invoice, setInvoice] = useState(null);
   const [cart, setCart] = useState([]);
-  const [customer, setCustomer] = useState({ name: "", phone: "", address: "" });
+  const [customer, setCustomer] = useState({
+    name: "",
+    phone: "",
+    address: "",
+  });
   const [customerId, setCustomerId] = useState(null);
   const [discount, setDiscount] = useState({ value: 0, type: "fixed" });
   const [paymentMethod, setPaymentMethod] = useState("cash");
-  const [paidAmount, setPaidAmount] = useState(0);
+  const [paidAmount, setPaidAmount] = useState(0); // المبلغ المدفوع مقدماً (أول دفعة)
+  const [paymentHistory, setPaymentHistory] = useState([]); // سجل المدفوعات الكامل
+  const [oldDownPayment, setOldDownPayment] = useState(0); // قيمة المقدم القديمة قبل التعديل
   const [seller, setSeller] = useState(null);
   const [sellerId, setSellerId] = useState(null);
   const [employeesList, setEmployeesList] = useState([]);
@@ -185,12 +247,23 @@ const EditBill = ({ invoiceId: initialInvoiceId, onBack, showToast }) => {
 
   /* ── Totals ── */
   const totalBefore = cart.reduce((s, i) => s + i.sale_price * i.quantity, 0);
-  const discAmt = discount.type === "percent"
-    ? totalBefore * (parseFloat(discount.value || 0) / 100)
-    : parseFloat(discount.value || 0);
+  const discAmt =
+    discount.type === "percent"
+      ? totalBefore * (parseFloat(discount.value || 0) / 100)
+      : parseFloat(discount.value || 0);
   const finalTotal = Math.max(0, totalBefore - discAmt);
-  const actualPaid = paymentMethod === "installment" ? parseFloat(paidAmount || 0) : finalTotal;
-  const remaining = Math.max(0, finalTotal - actualPaid);
+
+  // إجمالي المبلغ المحصل (مقدم + أقساط)
+  // إجمالي المبلغ المحصل حتى الآن (من جدول المدفوعات)
+  const totalPaid = paymentHistory.reduce(
+    (sum, p) => sum + (p.amount_paid || 0),
+    0
+  );
+  // الحد الأقصى المسموح به للمقدم الجديد = finalTotal - (totalPaid - oldDownPayment)
+  const maxAllowedDownPayment = finalTotal - (totalPaid - oldDownPayment);
+  const remaining = Math.max(0, finalTotal - totalPaid);
+
+  // ملاحظة: paidAmount هو فقط المبلغ المقدم (أول دفعة) يستخدم للعرض والتعديل، لكن حساب المتبقي يعتمد على totalPaid.
 
   /* ── Load Employees ── */
   const loadEmployees = async () => {
@@ -208,14 +281,21 @@ const EditBill = ({ invoiceId: initialInvoiceId, onBack, showToast }) => {
     }
   };
 
-  /* ── Load Invoice ── */
+  /* ── Load Invoice and Payment History ── */
   const loadInvoice = useCallback(async () => {
     if (!activeInvoiceId) return;
     setLoading(true);
     try {
       const db = await getDb();
-      const [inv] = await db.select("SELECT * FROM invoices WHERE id = $1 LIMIT 1", [activeInvoiceId]);
-      if (!inv) { showToast?.("الفاتورة غير موجودة", "error"); onBack?.(); return; }
+      const [inv] = await db.select(
+        "SELECT * FROM invoices WHERE id = $1 LIMIT 1",
+        [activeInvoiceId]
+      );
+      if (!inv) {
+        showToast?.("الفاتورة غير موجودة", "error");
+        onBack?.();
+        return;
+      }
       setInvoice(inv);
 
       setCustomer({
@@ -224,16 +304,38 @@ const EditBill = ({ invoiceId: initialInvoiceId, onBack, showToast }) => {
         address: inv.customer_address || "",
       });
       setCustomerId(inv.customer_id ?? null);
-      setDiscount({ value: inv.discount_value ?? 0, type: inv.discount_type || "fixed" });
+      setDiscount({
+        value: inv.discount_value ?? 0,
+        type: inv.discount_type || "fixed",
+      });
 
       if (inv.seller_id) {
         setSellerId(inv.seller_id);
-        setSeller({ id: inv.seller_id, name: inv.seller_name, commission_rate: inv.commission_rate || 0 });
+        setSeller({
+          id: inv.seller_id,
+          name: inv.seller_name,
+          commission_rate: inv.commission_rate || 0,
+        });
       }
 
       const method = inv.payment_method || "cash";
       setPaymentMethod(method);
-      setPaidAmount(method === "installment" ? (inv.paid_amount ?? 0) : (inv.total_after_discount ?? 0));
+
+      // جلب سجل المدفوعات الكامل (من installment_payments)
+      const payments = await db.select(
+        "SELECT * FROM installment_payments WHERE invoice_id = $1 ORDER BY payment_date ASC",
+        [activeInvoiceId]
+      );
+      setPaymentHistory(payments || []);
+
+      // تعيين المبلغ المقدم (أول دفعة) إذا كانت الطريقة تقسيط
+      if (method === "installment" && payments.length > 0) {
+        setPaidAmount(payments[0].amount_paid);
+      } else if (method === "installment") {
+        setPaidAmount(inv.paid_amount || 0);
+      } else {
+        setPaidAmount(inv.total_after_discount || 0);
+      }
 
       const items = await db.select(
         `SELECT ii.*, p.cost_price, pv.stock AS variant_stock, pv.color, pv.size
@@ -244,19 +346,21 @@ const EditBill = ({ invoiceId: initialInvoiceId, onBack, showToast }) => {
         [activeInvoiceId]
       );
 
-      setCart(items.map((i) => ({
-        cartKey: i.variant_id ?? i.product_id,
-        id: i.product_id,
-        variant_id: i.variant_id ?? null,
-        name: i.product_name,
-        sale_price: i.unit_price,
-        cost_price: i.cost_price || 0,
-        quantity: i.quantity,
-        stock: (i.variant_stock ?? 0) + i.quantity,
-        size: i.size || "",
-        color: i.color || "",
-        originalQty: i.quantity,
-      })));
+      setCart(
+        items.map((i) => ({
+          cartKey: i.variant_id ?? i.product_id,
+          id: i.product_id,
+          variant_id: i.variant_id ?? null,
+          name: i.product_name,
+          sale_price: i.unit_price,
+          cost_price: i.cost_price || 0,
+          quantity: i.quantity,
+          stock: (i.variant_stock ?? 0) + i.quantity,
+          size: i.size || "",
+          color: i.color || "",
+          originalQty: i.quantity,
+        }))
+      );
     } catch (e) {
       showToast?.("خطأ في تحميل الفاتورة: " + e.message, "error");
     } finally {
@@ -264,13 +368,20 @@ const EditBill = ({ invoiceId: initialInvoiceId, onBack, showToast }) => {
     }
   }, [activeInvoiceId]);
 
-  useEffect(() => { loadInvoice(); }, [loadInvoice]);
-  useEffect(() => { loadEmployees(); }, []);
+  useEffect(() => {
+    loadInvoice();
+  }, [loadInvoice]);
+  useEffect(() => {
+    loadEmployees();
+  }, []);
 
   /* ── Product Search ── */
   const handleSearch = async (q) => {
     setSearchQuery(q);
-    if (q.length < 1) { setSearchResults([]); return; }
+    if (q.length < 1) {
+      setSearchResults([]);
+      return;
+    }
     try {
       const db = await getDb();
       const rows = await db.select(
@@ -283,26 +394,51 @@ const EditBill = ({ invoiceId: initialInvoiceId, onBack, showToast }) => {
         [`%${q}%`, q]
       );
       setSearchResults(rows);
-      if (rows.length === 1 && (rows[0].barcode === q || rows[0].variant_barcode === q)) {
+      if (
+        rows.length === 1 &&
+        (rows[0].barcode === q || rows[0].variant_barcode === q)
+      ) {
         addToCart(rows[0]);
       }
-    } catch (e) { console.warn(e); }
+    } catch (e) {
+      console.warn(e);
+    }
   };
 
   const addToCart = (product) => {
-    if (product.stock <= 0) { showToast?.("المنتج نفذ من المخزن", "error"); return; }
+    if (product.stock <= 0) {
+      showToast?.("المنتج نفذ من المخزن", "error");
+      return;
+    }
     const cartKey = product.variant_id ?? product.id;
     const ex = cart.find((i) => i.cartKey === cartKey);
     if (ex) {
-      if (ex.quantity + 1 > product.stock) { showToast?.(`المتاح: ${product.stock}`, "warning"); return; }
-      setCart(cart.map((i) => i.cartKey === cartKey ? { ...i, quantity: i.quantity + 1 } : i));
+      if (ex.quantity + 1 > product.stock) {
+        showToast?.(`المتاح: ${product.stock}`, "warning");
+        return;
+      }
+      setCart(
+        cart.map((i) =>
+          i.cartKey === cartKey ? { ...i, quantity: i.quantity + 1 } : i
+        )
+      );
     } else {
-      setCart([...cart, {
-        cartKey, id: product.id, variant_id: product.variant_id ?? null,
-        name: product.name, sale_price: product.sale_price, cost_price: product.cost_price,
-        quantity: 1, stock: product.stock, size: product.size || "", color: product.color || "",
-        originalQty: 0,
-      }]);
+      setCart([
+        ...cart,
+        {
+          cartKey,
+          id: product.id,
+          variant_id: product.variant_id ?? null,
+          name: product.name,
+          sale_price: product.sale_price,
+          cost_price: product.cost_price,
+          quantity: 1,
+          stock: product.stock,
+          size: product.size || "",
+          color: product.color || "",
+          originalQty: 0,
+        },
+      ]);
       setHighlightRow(cartKey);
       setTimeout(() => setHighlightRow(null), 900);
     }
@@ -312,31 +448,41 @@ const EditBill = ({ invoiceId: initialInvoiceId, onBack, showToast }) => {
   };
 
   const updateQty = (cartKey, delta) => {
-    setCart(cart.map((item) => {
-      if (item.cartKey !== cartKey) return item;
-      const nq = item.quantity + delta;
-      if (delta > 0 && nq > item.stock) { showToast?.(`المتاح: ${item.stock}`, "warning"); return item; }
-      return nq > 0 ? { ...item, quantity: nq } : item;
-    }));
+    setCart(
+      cart.map((item) => {
+        if (item.cartKey !== cartKey) return item;
+        const nq = item.quantity + delta;
+        if (delta > 0 && nq > item.stock) {
+          showToast?.(`المتاح: ${item.stock}`, "warning");
+          return item;
+        }
+        return nq > 0 ? { ...item, quantity: nq } : item;
+      })
+    );
   };
 
   const editField = (cartKey, field, raw) => {
     const value = field === "sale_price" ? parseFloat(raw) || 0 : raw;
-    setCart(cart.map((i) => {
-      if (i.cartKey !== cartKey) return i;
-      if (field === "sale_price" && value < (i.cost_price || 0)) {
-        showToast?.(`السعر لا يقل عن التكلفة (${i.cost_price} ج.م)`, "error");
-        return i;
-      }
-      return { ...i, [field]: value };
-    }));
+    setCart(
+      cart.map((i) => {
+        if (i.cartKey !== cartKey) return i;
+        if (field === "sale_price" && value < (i.cost_price || 0)) {
+          showToast?.(`السعر لا يقل عن التكلفة (${i.cost_price} ج.م)`, "error");
+          return i;
+        }
+        return { ...i, [field]: value };
+      })
+    );
   };
 
   /* ── Customer Search ── */
   const handleCustomerSearch = async (name) => {
     setCustomer((c) => ({ ...c, name }));
     setCustomerId(null);
-    if (name.length < 2) { setCustomerSuggestions([]); return; }
+    if (name.length < 2) {
+      setCustomerSuggestions([]);
+      return;
+    }
     try {
       const db = await getDb();
       let rows = [];
@@ -354,7 +500,9 @@ const EditBill = ({ invoiceId: initialInvoiceId, onBack, showToast }) => {
         );
       }
       setCustomerSuggestions(rows);
-    } catch (e) { console.warn(e); }
+    } catch (e) {
+      console.warn(e);
+    }
   };
 
   const selectCustomer = (c) => {
@@ -369,7 +517,7 @@ const EditBill = ({ invoiceId: initialInvoiceId, onBack, showToast }) => {
 
   const onAddNewCustomerAction = () => {
     setCustomerId(null);
-    setCustomer(prev => ({ ...prev, phone: "", address: "" }));
+    setCustomer((prev) => ({ ...prev, phone: "", address: "" }));
     showToast?.("تم اختيار وضع تسجيل عميل جديد", "info");
   };
 
@@ -416,7 +564,7 @@ const EditBill = ({ invoiceId: initialInvoiceId, onBack, showToast }) => {
             </div>
             <div class="divider"></div>
             
-            <div style="display: flex; justifyContent: space-between; font-size: 11px;">
+            <div style="display: flex; justify-content: space-between; font-size: 11px;">
               <span>رقم: #${invoice?.invoice_number}</span>
               <span>${new Date().toLocaleDateString("ar-EG")}</span>
             </div>
@@ -430,14 +578,18 @@ const EditBill = ({ invoiceId: initialInvoiceId, onBack, showToast }) => {
                 <tr><th>الصنف</th><th>ق</th><th>السعر</th><th>الإجمالي</th></tr>
               </thead>
               <tbody>
-                ${cart.map(item => `
+                ${cart
+                  .map(
+                    (item) => `
                   <tr>
-                    <td>${item.name}${item.size ? ` (${item.size})` : ''}${item.color ? ` - ${item.color}` : ''}</td>
+                    <td>${item.name}${item.size ? ` (${item.size})` : ""}${item.color ? ` - ${item.color}` : ""}</td>
                     <td style="text-align: center;">${item.quantity}</td>
                     <td style="text-align: left;">${item.sale_price.toFixed(2)}</td>
                     <td style="text-align: left;">${(item.quantity * item.sale_price).toFixed(2)}</td>
                   </tr>
-                `).join('')}
+                `
+                  )
+                  .join("")}
               </tbody>
             </table>
             
@@ -447,12 +599,16 @@ const EditBill = ({ invoiceId: initialInvoiceId, onBack, showToast }) => {
               <span>الإجمالي:</span>
               <span>${totalBefore.toFixed(2)} ج.م</span>
             </div>
-            ${discAmt > 0 ? `
+            ${
+              discAmt > 0
+                ? `
               <div style="display: flex; justify-content: space-between;">
                 <span>الخصم:</span>
                 <span>- ${discAmt.toFixed(2)} ج.م</span>
               </div>
-            ` : ''}
+            `
+                : ""
+            }
             
             <div class="total-row" style="display: flex; justify-content: space-between;">
               <span>الصافي:</span>
@@ -467,7 +623,7 @@ const EditBill = ({ invoiceId: initialInvoiceId, onBack, showToast }) => {
       `;
     };
 
-    const printWindow = window.open('', '_blank', 'width=400,height=600');
+    const printWindow = window.open("", "_blank", "width=400,height=600");
     if (printWindow) {
       printWindow.document.write(generateReceiptHTML());
       printWindow.document.close();
@@ -476,10 +632,10 @@ const EditBill = ({ invoiceId: initialInvoiceId, onBack, showToast }) => {
         printWindow.onafterprint = () => printWindow.close();
       };
     } else {
-      const iframe = document.createElement('iframe');
-      iframe.style.position = 'absolute';
-      iframe.style.width = '0px';
-      iframe.style.height = '0px';
+      const iframe = document.createElement("iframe");
+      iframe.style.position = "absolute";
+      iframe.style.width = "0px";
+      iframe.style.height = "0px";
       document.body.appendChild(iframe);
       iframe.contentDocument.write(generateReceiptHTML());
       iframe.contentDocument.close();
@@ -490,9 +646,28 @@ const EditBill = ({ invoiceId: initialInvoiceId, onBack, showToast }) => {
     }
   };
 
-  /* ── Save ── */
+  /* ── Save Edits (مع منع الحفظ إذا السلة فارغة أو المقدم أكبر من الإجمالي) ── */
   const saveEdits = async (shouldPrint = true) => {
-    if (cart.length === 0) { showToast?.("السلة فارغة", "error"); return; }
+    // 1. منع الحفظ إذا السلة فارغة
+    if (cart.length === 0) {
+      showToast?.(
+        "لا يمكن حفظ الفاتورة بدون أي أصناف. أضف منتجاً أولاً.",
+        "error"
+      );
+      return;
+    }
+
+    if (paymentMethod === "installment") {
+      const newDownPayment = parseFloat(paidAmount) || 0;
+      if (newDownPayment > maxAllowedDownPayment) {
+        showToast?.(
+          `المبلغ المدفوع (${newDownPayment.toFixed(2)} ج.م) لا يمكن أن يزيد عن المتبقي الفعلي (${maxAllowedDownPayment.toFixed(2)} ج.م). الرجاء تعديل المبلغ.`,
+          "error"
+        );
+        return;
+      }
+    }
+
     setSaving(true);
     try {
       const db = await getDb();
@@ -507,8 +682,10 @@ const EditBill = ({ invoiceId: initialInvoiceId, onBack, showToast }) => {
           if (existing.length) {
             finalCustomerId = existing[0].id;
           } else {
-            await db.execute("INSERT INTO customers (name, phone, address) VALUES ($1, $2, $3)", 
-              [customer.name.trim(), customer.phone, customer.address]);
+            await db.execute(
+              "INSERT INTO customers (name, phone, address) VALUES ($1, $2, $3)",
+              [customer.name.trim(), customer.phone, customer.address]
+            );
             const [res] = await db.select("SELECT last_insert_rowid() AS id");
             finalCustomerId = res?.id;
           }
@@ -517,45 +694,77 @@ const EditBill = ({ invoiceId: initialInvoiceId, onBack, showToast }) => {
         }
       }
 
-      // 1. تحديث المخزون - استرجاع الكميات القديمة
-      const oldItems = await db.select("SELECT * FROM invoice_items WHERE invoice_id = $1", [activeInvoiceId]);
+      // 3. تحديث المخزون - استرجاع الكميات القديمة
+      const oldItems = await db.select(
+        "SELECT * FROM invoice_items WHERE invoice_id = $1",
+        [activeInvoiceId]
+      );
       for (const oldItem of oldItems) {
-        const newItem = cart.find((i) => 
-          oldItem.variant_id ? i.variant_id === oldItem.variant_id : i.id === oldItem.product_id
+        const newItem = cart.find((i) =>
+          oldItem.variant_id
+            ? i.variant_id === oldItem.variant_id
+            : i.id === oldItem.product_id
         );
         const diff = oldItem.quantity - (newItem ? newItem.quantity : 0);
         if (diff !== 0) {
           const table = oldItem.variant_id ? "product_variants" : "products";
           const id = oldItem.variant_id || oldItem.product_id;
-          await db.execute(`UPDATE ${table} SET stock = stock + $1 WHERE id = $2`, [diff, id]);
-        }
-      }
-      
-      // 2. خصم الكميات الجديدة
-      for (const newItem of cart) {
-        const existed = oldItems.find((o) => 
-          newItem.variant_id ? o.variant_id === newItem.variant_id : o.product_id === newItem.id
-        );
-        if (!existed) {
-          const table = newItem.variant_id ? "product_variants" : "products";
-          await db.execute(`UPDATE ${table} SET stock = stock - $1 WHERE id = $2`, [newItem.quantity, newItem.variant_id || newItem.id]);
+          await db.execute(
+            `UPDATE ${table} SET stock = stock + $1 WHERE id = $2`,
+            [diff, id]
+          );
         }
       }
 
-      // 3. حذف الأصناف القديمة وإضافة الجديدة
-      await db.execute("DELETE FROM invoice_items WHERE invoice_id = $1", [activeInvoiceId]);
+      // 4. خصم الكميات الجديدة
+      for (const newItem of cart) {
+        const existed = oldItems.find((o) =>
+          newItem.variant_id
+            ? o.variant_id === newItem.variant_id
+            : o.product_id === newItem.id
+        );
+        if (!existed) {
+          const table = newItem.variant_id ? "product_variants" : "products";
+          await db.execute(
+            `UPDATE ${table} SET stock = stock - $1 WHERE id = $2`,
+            [newItem.quantity, newItem.variant_id || newItem.id]
+          );
+        }
+      }
+
+      // 5. حذف الأصناف القديمة وإضافة الجديدة
+      await db.execute("DELETE FROM invoice_items WHERE invoice_id = $1", [
+        activeInvoiceId,
+      ]);
       for (const item of cart) {
         await db.execute(
           `INSERT INTO invoice_items (invoice_id, product_id, variant_id, product_name, quantity, unit_price, total_price, cost_price_at_sale)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-          [activeInvoiceId, item.id, item.variant_id, item.name, item.quantity, item.sale_price, item.quantity * item.sale_price, item.cost_price || 0]
+          [
+            activeInvoiceId,
+            item.id,
+            item.variant_id,
+            item.name,
+            item.quantity,
+            item.sale_price,
+            item.quantity * item.sale_price,
+            item.cost_price || 0,
+          ]
         );
       }
 
-      // 4. حساب العمولة
-      const commissionAmount = seller ? (finalTotal * (seller.commission_rate || 0) / 100) : (invoice?.commission_amount || 0);
+      // 6. حساب العمولة
+      const commissionAmount = seller
+        ? (finalTotal * (seller.commission_rate || 0)) / 100
+        : invoice?.commission_amount || 0;
 
-      // 5. تحديث الفاتورة
+      // 7. تحديث الفاتورة الأساسية (paid_amount تصبح إجمالي المحصل، ولكننا نحتفظ بالمقدم للتوافق)
+      const totalPaidAmount = paymentHistory.reduce(
+        (sum, p) => sum + p.amount_paid,
+        0
+      );
+      const remainingAmount = finalTotal - totalPaidAmount;
+
       await db.execute(
         `UPDATE invoices SET
            customer_name = $1, customer_phone = $2, customer_address = $3, customer_id = $4,
@@ -564,17 +773,66 @@ const EditBill = ({ invoiceId: initialInvoiceId, onBack, showToast }) => {
            seller_id = $12, seller_name = $13, commission_amount = $14
          WHERE id = $15`,
         [
-          customer.name, customer.phone, customer.address, finalCustomerId,
-          totalBefore, discount.value, discount.type, finalTotal,
-          paymentMethod, actualPaid, remaining,
-          sellerId || invoice?.seller_id, seller?.name || invoice?.seller_name, commissionAmount,
+          customer.name,
+          customer.phone,
+          customer.address,
+          finalCustomerId,
+          totalBefore,
+          discount.value,
+          discount.type,
+          finalTotal,
+          paymentMethod,
+          totalPaidAmount,
+          remainingAmount,
+          sellerId || invoice?.seller_id,
+          seller?.name || invoice?.seller_name,
+          commissionAmount,
           activeInvoiceId,
         ]
       );
 
-      // 6. إرسال إشارة للتحديث
-      localStorage.setItem('invoices_updated', Date.now().toString());
-      localStorage.setItem('invoice_updated', activeInvoiceId.toString());
+      // 8. معالجة دفعة المقدم للتقسيط (تحديث أول دفعة في installment_payments)
+      if (paymentMethod === "installment") {
+        const existingPayments = await db.select(
+          "SELECT * FROM installment_payments WHERE invoice_id = $1 ORDER BY payment_date ASC",
+          [activeInvoiceId]
+        );
+        const downPaymentAmount = parseFloat(paidAmount) || 0;
+        if (existingPayments.length > 0) {
+          // تحديث الدفعة الأولى بقيمة المقدم الجديد
+          const firstPaymentId = existingPayments[0].id;
+          if (downPaymentAmount > 0) {
+            await db.execute(
+              "UPDATE installment_payments SET amount_paid = $1 WHERE id = $2",
+              [downPaymentAmount, firstPaymentId]
+            );
+          } else {
+            await db.execute("DELETE FROM installment_payments WHERE id = $1", [
+              firstPaymentId,
+            ]);
+          }
+        } else if (downPaymentAmount > 0) {
+          // إدراج دفعة جديدة إذا لم تكن موجودة
+          await db.execute(
+            `INSERT INTO installment_payments 
+             (invoice_id, customer_id, amount_paid, payment_method, transaction_type, note, payment_date)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [
+              activeInvoiceId,
+              finalCustomerId,
+              downPaymentAmount,
+              paymentMethod,
+              "installment",
+              "دفعة مقدمة (معدلة)",
+              new Date().toISOString(),
+            ]
+          );
+        }
+      }
+
+      // 9. إرسال إشارة للتحديث
+      localStorage.setItem("invoices_updated", Date.now().toString());
+      localStorage.setItem("invoice_updated", activeInvoiceId.toString());
 
       if (shouldPrint) {
         try {
@@ -587,9 +845,21 @@ const EditBill = ({ invoiceId: initialInvoiceId, onBack, showToast }) => {
 
       showToast?.("تم حفظ التعديلات بنجاح ✓", "success");
       setShowConfirm(false);
-      
-      onBack?.();
-      
+
+// بدلاً من onBack?.();
+setActiveInvoiceId(null);
+setInvoiceInput("");
+setInvoice(null);
+setCart([]);
+setCustomer({ name: "", phone: "", address: "" });
+setCustomerId(null);
+setDiscount({ value: 0, type: "fixed" });
+setPaymentMethod("cash");
+setPaidAmount(0);
+setPaymentHistory([]);
+setOldDownPayment(0);
+setSeller(null);
+setSellerId(null);
     } catch (e) {
       console.error(e);
       showToast?.("خطأ في الحفظ: " + e, "error");
@@ -602,6 +872,15 @@ const EditBill = ({ invoiceId: initialInvoiceId, onBack, showToast }) => {
   const stockColor = (stock, qty) => {
     const r = stock - qty;
     return r <= 0 ? "#ef4444" : r <= 3 ? "#f59e0b" : "#10b981";
+  };
+
+  const isSaveDisabled = () => {
+    if (cart.length === 0) return true;
+    if (paymentMethod === "installment") {
+      const newDown = parseFloat(paidAmount) || 0;
+      if (newDown > maxAllowedDownPayment) return true;
+    }
+    return false;
   };
 
   if (loading)
@@ -649,7 +928,6 @@ const EditBill = ({ invoiceId: initialInvoiceId, onBack, showToast }) => {
 
   return (
     <div className="ei-root ei-animate">
-
       <div className="ei-topbar">
         <div className="ei-topbar-badge">
           <div>
@@ -661,7 +939,9 @@ const EditBill = ({ invoiceId: initialInvoiceId, onBack, showToast }) => {
         <div className="ei-topbar-badge">
           <div>
             <span className="lbl">الحالة</span>
-            <span className={`ei-status-pill ${invoice?.status === "completed" ? "complete" : "pending"}`}>
+            <span
+              className={`ei-status-pill ${invoice?.status === "completed" ? "complete" : "pending"}`}
+            >
               {invoice?.status === "completed" ? "مكتملة" : "معلقة"}
             </span>
           </div>
@@ -671,7 +951,13 @@ const EditBill = ({ invoiceId: initialInvoiceId, onBack, showToast }) => {
           <div>
             <span className="lbl">تاريخ الإنشاء</span>
             <span className="val">
-              {invoice?.created_at ? new Date(invoice.created_at).toLocaleDateString("ar-EG", { day: "numeric", month: "long", year: "numeric" }) : "—"}
+              {invoice?.created_at
+                ? new Date(invoice.created_at).toLocaleDateString("ar-EG", {
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  })
+                : "—"}
             </span>
           </div>
         </div>
@@ -688,12 +974,21 @@ const EditBill = ({ invoiceId: initialInvoiceId, onBack, showToast }) => {
         <div>
           <h2 className="ei-page-title">
             تعديل الفاتورة
-            <span className="ei-count-badge" style={{ marginRight: 10 }}>{cart.length} صنف</span>
+            <span className="ei-count-badge" style={{ marginRight: 10 }}>
+              {cart.length} صنف
+            </span>
           </h2>
           <p className="ei-page-sub">
-            فاتورة رقم: <strong style={{ color: "var(--text)" }}>#{invoice?.invoice_number}</strong>
+            فاتورة رقم:{" "}
+            <strong style={{ color: "var(--text)" }}>
+              #{invoice?.invoice_number}
+            </strong>
             <span className="ei-edit-badge">وضع التعديل</span>
-            {customerId && <span className="ei-linked-badge"><CheckCircle2 size={9}/> مرتبط بعميل</span>}
+            {customerId && (
+              <span className="ei-linked-badge">
+                <CheckCircle2 size={9} /> مرتبط بعميل
+              </span>
+            )}
           </p>
         </div>
         <div className="ei-header-actions">
@@ -706,17 +1001,40 @@ const EditBill = ({ invoiceId: initialInvoiceId, onBack, showToast }) => {
                 placeholder="/ إضافة منتج بالاسم أو الباركود…"
                 value={searchQuery}
                 onChange={(e) => handleSearch(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && searchResults.length > 0 && addToCart(searchResults[0])}
+                onKeyDown={(e) =>
+                  e.key === "Enter" &&
+                  searchResults.length > 0 &&
+                  addToCart(searchResults[0])
+                }
               />
             </div>
             {searchResults.length > 0 && (
               <div className="ei-dropdown">
                 {searchResults.map((p) => (
-                  <div key={`${p.id}-${p.variant_id}`} className="ei-dropdown-item" onClick={() => addToCart(p)}>
+                  <div
+                    key={`${p.id}-${p.variant_id}`}
+                    className="ei-dropdown-item"
+                    onClick={() => addToCart(p)}
+                  >
                     <div>
-                      <div className="pname">{p.name} {p.size && <span style={{ fontSize: 11, color: "var(--text3)" }}>{p.size}</span>} {p.color && <span style={{ fontSize: 11, color: "var(--text3)" }}>{p.color}</span>}</div>
+                      <div className="pname">
+                        {p.name}{" "}
+                        {p.size && (
+                          <span style={{ fontSize: 11, color: "var(--text3)" }}>
+                            {p.size}
+                          </span>
+                        )}{" "}
+                        {p.color && (
+                          <span style={{ fontSize: 11, color: "var(--text3)" }}>
+                            {p.color}
+                          </span>
+                        )}
+                      </div>
                       <div className="pmeta">
-                        <span className="ei-stock-dot" style={{ background: stockColor(p.stock, 0) }} />
+                        <span
+                          className="ei-stock-dot"
+                          style={{ background: stockColor(p.stock, 0) }}
+                        />
                         {p.stock} متاح
                       </div>
                     </div>
@@ -734,7 +1052,6 @@ const EditBill = ({ invoiceId: initialInvoiceId, onBack, showToast }) => {
 
       {/* Main layout */}
       <div className="ei-layout">
-
         {/* Items table */}
         <div className="ei-table-card">
           <table className="ei-table">
@@ -750,14 +1067,21 @@ const EditBill = ({ invoiceId: initialInvoiceId, onBack, showToast }) => {
             </thead>
             <tbody>
               {cart.map((item) => (
-                <tr key={item.cartKey} className={`${highlightRow === item.cartKey ? "ei-row-highlight" : ""} ${item.originalQty === 0 ? "ei-row-new" : ""}`}>
+                <tr
+                  key={item.cartKey}
+                  className={`${highlightRow === item.cartKey ? "ei-row-highlight" : ""} ${item.originalQty === 0 ? "ei-row-new" : ""}`}
+                >
                   <td>
                     <div className="ei-product-name">
-                      {item.originalQty === 0 && <span className="ei-new-chip">جديد</span>}
+                      {item.originalQty === 0 && (
+                        <span className="ei-new-chip">جديد</span>
+                      )}
                       {item.name}
                     </div>
                     {(item.size || item.color) && (
-                      <div className="ei-product-variant">{item.size} {item.color}</div>
+                      <div className="ei-product-variant">
+                        {item.size} {item.color}
+                      </div>
                     )}
                   </td>
                   <td>
@@ -769,26 +1093,52 @@ const EditBill = ({ invoiceId: initialInvoiceId, onBack, showToast }) => {
                       style={{ color: "var(--text)" }}
                       showToast={showToast}
                     />
-                    <small style={{ color: "var(--text3)", fontSize: 11 }}> ج.م</small>
+                    <small style={{ color: "var(--text3)", fontSize: 11 }}>
+                      {" "}
+                      ج.م
+                    </small>
                   </td>
                   <td>
                     <div className="ei-qty-ctrl">
-                      <button className="ei-qty-btn" onClick={() => updateQty(item.cartKey, 1)}>+</button>
+                      <button
+                        className="ei-qty-btn"
+                        onClick={() => updateQty(item.cartKey, 1)}
+                      >
+                        +
+                      </button>
                       <span className="ei-qty-val">{item.quantity}</span>
-                      <button className="ei-qty-btn" onClick={() => updateQty(item.cartKey, -1)}>−</button>
+                      <button
+                        className="ei-qty-btn"
+                        onClick={() => updateQty(item.cartKey, -1)}
+                      >
+                        −
+                      </button>
                     </div>
                   </td>
                   <td style={{ textAlign: "center" }}>
-                    <span className="ei-stock-badge" style={{ background: stockColor(item.stock, item.quantity) }}>
+                    <span
+                      className="ei-stock-badge"
+                      style={{
+                        background: stockColor(item.stock, item.quantity),
+                      }}
+                    >
                       {item.stock - item.quantity} متبقي
                     </span>
                   </td>
                   <td>
-                    <span className="ei-total-cell">{(item.quantity * item.sale_price).toFixed(2)}</span>
-                    <small style={{ color: "var(--text3)", fontSize: 11 }}> ج.م</small>
+                    <span className="ei-total-cell">
+                      {(item.quantity * item.sale_price).toFixed(2)}
+                    </span>
+                    <small style={{ color: "var(--text3)", fontSize: 11 }}>
+                      {" "}
+                      ج.م
+                    </small>
                   </td>
                   <td>
-                    <button className="ei-del-btn" onClick={() => setDeleteTarget(item)}>
+                    <button
+                      className="ei-del-btn"
+                      onClick={() => setDeleteTarget(item)}
+                    >
                       <Trash2 size={13} />
                     </button>
                   </td>
@@ -800,9 +1150,17 @@ const EditBill = ({ invoiceId: initialInvoiceId, onBack, showToast }) => {
                     <div className="ei-empty-row">
                       <div className="ei-empty-icon">🛒</div>
                       <div>السلة فارغة</div>
-                      <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 4 }}>ابحث أو امسح باركود لإضافة منتج</div>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          color: "var(--text3)",
+                          marginTop: 4,
+                        }}
+                      >
+                        لا يمكن حفظ الفاتورة بدون أصناف
+                      </div>
                     </div>
-                   </td>
+                  </td>
                 </tr>
               )}
             </tbody>
@@ -812,54 +1170,76 @@ const EditBill = ({ invoiceId: initialInvoiceId, onBack, showToast }) => {
         {/* Summary sidebar */}
         <div className="ei-summary">
           <div className="ei-summary-header">
-            <div className="ei-summary-header-icon"><ShoppingCart size={16} /></div>
+            <div className="ei-summary-header-icon">
+              <ShoppingCart size={16} />
+            </div>
             فاتورة #{invoice?.invoice_number}
           </div>
 
           <div className="ei-summary-body">
             {/* Seller Section */}
             <div className="ei-customer-section">
-              <div className="ei-customer-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '10px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <div
+                className="ei-customer-title"
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  width: "100%",
+                  marginBottom: "10px",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                   <Users size={12} /> البائع / الكاشير
                 </div>
-                <button 
+                <button
                   onClick={() => setShowSellerModal(true)}
-                  style={{ 
-                    fontSize: '12px', 
-                    background: 'rgba(59, 130, 246, 0.1)', 
-                    color: '#3b82f6', 
-                    border: '1px solid rgba(59, 130, 246, 0.3)', 
-                    padding: '4px 10px', 
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 3
+                  style={{
+                    fontSize: "12px",
+                    background: "rgba(59, 130, 246, 0.1)",
+                    color: "#3b82f6",
+                    border: "1px solid rgba(59, 130, 246, 0.3)",
+                    padding: "4px 10px",
+                    borderRadius: "4px",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 3,
                   }}
                 >
                   <RotateCcw size={14} /> تغيير البائع
                 </button>
               </div>
-              
-              <div style={{ 
-                background: 'var(--surface2)', 
-                padding: '10px', 
-                borderRadius: '8px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-              }}>
+
+              <div
+                style={{
+                  background: "var(--surface2)",
+                  padding: "10px",
+                  borderRadius: "8px",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
                 <div>
-                  <span style={{ fontWeight: 600, fontSize: '14px' }}>{seller?.name || invoice?.seller_name || "—"}</span>
+                  <span style={{ fontWeight: 600, fontSize: "14px" }}>
+                    {seller?.name || invoice?.seller_name || "—"}
+                  </span>
                   {seller?.commission_rate !== undefined && (
-                    <span style={{ fontSize: '11px', color: 'var(--text3)', marginRight: '8px' }}>
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        color: "var(--text3)",
+                        marginRight: "8px",
+                      }}
+                    >
                       عمولة: {seller.commission_rate}%
                     </span>
                   )}
                 </div>
-                <span style={{ fontSize: '12px', color: 'var(--accent)' }}>
-                  {seller?.total_sales > 0 && `إجمالي المبيعات: ${seller.total_sales.toFixed(0)} ج.م`}
+                <span style={{ fontSize: "12px", color: "var(--accent)" }}>
+                  {seller?.total_sales > 0 &&
+                    `إجمالي المبيعات: ${seller.total_sales.toFixed(0)} ج.م`}
                 </span>
               </div>
             </div>
@@ -868,29 +1248,38 @@ const EditBill = ({ invoiceId: initialInvoiceId, onBack, showToast }) => {
 
             {/* Customer Section */}
             <div className="ei-customer-section">
-              <div className="ei-customer-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '10px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <div
+                className="ei-customer-title"
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  width: "100%",
+                  marginBottom: "10px",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                   <User size={12} /> بيانات العميل
                 </div>
-                
+
                 {(customer.name || customer.phone) && (
-                  <button 
+                  <button
                     onClick={() => {
                       setCustomer({ name: "", phone: "", address: "" });
                       setCustomerId(null);
                       setCustomerSuggestions([]);
                     }}
-                    style={{ 
-                      fontSize: '12px', 
-                      background: 'rgba(239, 68, 68, 0.1)', 
-                      color: '#ef4444', 
-                      border: 'none', 
-                      padding: '4px 10px', 
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 3
+                    style={{
+                      fontSize: "12px",
+                      background: "rgba(239, 68, 68, 0.1)",
+                      color: "#ef4444",
+                      border: "none",
+                      padding: "4px 10px",
+                      borderRadius: "4px",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 3,
                     }}
                   >
                     <RotateCcw size={14} /> تغيير العميل
@@ -909,12 +1298,21 @@ const EditBill = ({ invoiceId: initialInvoiceId, onBack, showToast }) => {
                 onAddNew={onAddNewCustomerAction}
               />
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 8,
+                  marginTop: 8,
+                }}
+              >
                 <CustomerField
                   icon={<Phone size={12} />}
                   label="الهاتف"
                   value={customer.phone}
-                  onChange={(e) => setCustomer((c) => ({ ...c, phone: e.target.value }))}
+                  onChange={(e) =>
+                    setCustomer((c) => ({ ...c, phone: e.target.value }))
+                  }
                   type="tel"
                   placeholder="01xxxxxxxxx"
                 />
@@ -922,14 +1320,26 @@ const EditBill = ({ invoiceId: initialInvoiceId, onBack, showToast }) => {
                   icon={<MapPin size={12} />}
                   label="العنوان"
                   value={customer.address}
-                  onChange={(e) => setCustomer((c) => ({ ...c, address: e.target.value }))}
+                  onChange={(e) =>
+                    setCustomer((c) => ({ ...c, address: e.target.value }))
+                  }
                   placeholder="المدينة…"
                 />
               </div>
 
               {!customerId && customer.name.length > 2 && (
-                <div style={{ fontSize: '12px', color: 'var(--green)', marginTop: 5, display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <Sparkles size={14} /> سيتم تسجيل "{customer.name}" كعميل جديد تلقائياً
+                <div
+                  style={{
+                    fontSize: "12px",
+                    color: "var(--green)",
+                    marginTop: 5,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                  }}
+                >
+                  <Sparkles size={14} /> سيتم تسجيل "{customer.name}" كعميل جديد
+                  تلقائياً
                 </div>
               )}
             </div>
@@ -943,18 +1353,24 @@ const EditBill = ({ invoiceId: initialInvoiceId, onBack, showToast }) => {
             </div>
 
             <div className="ei-calc-row" style={{ alignItems: "flex-start" }}>
-              <span className="lbl" style={{ paddingTop: 8 }}>خصم</span>
+              <span className="lbl" style={{ paddingTop: 8 }}>
+                خصم
+              </span>
               <div className="ei-discount-row">
                 <input
                   type="number"
                   value={discount.value}
-                  onChange={(e) => setDiscount((d) => ({ ...d, value: e.target.value }))}
+                  onChange={(e) =>
+                    setDiscount((d) => ({ ...d, value: e.target.value }))
+                  }
                   className="ei-discount-input"
                   style={{ width: 70 }}
                 />
                 <select
                   value={discount.type}
-                  onChange={(e) => setDiscount((d) => ({ ...d, type: e.target.value }))}
+                  onChange={(e) =>
+                    setDiscount((d) => ({ ...d, type: e.target.value }))
+                  }
                   className="ei-discount-select"
                 >
                   <option value="fixed">ج.م</option>
@@ -966,7 +1382,9 @@ const EditBill = ({ invoiceId: initialInvoiceId, onBack, showToast }) => {
             {discAmt > 0 && (
               <div className="ei-calc-row">
                 <span className="lbl">قيمة الخصم</span>
-                <span style={{ color: "var(--red)", fontWeight: 600 }}>− {discAmt.toFixed(2)} ج.م</span>
+                <span style={{ color: "var(--red)", fontWeight: 600 }}>
+                  − {discAmt.toFixed(2)} ج.م
+                </span>
               </div>
             )}
 
@@ -981,9 +1399,18 @@ const EditBill = ({ invoiceId: initialInvoiceId, onBack, showToast }) => {
             <div className="ei-payment-label">طريقة الدفع</div>
             <div className="ei-payment-methods">
               {[
-                { id: "cash", label: "كاش", icon: <Banknote size={18} />, cls: "green" },
+                {
+                  id: "cash",
+                  label: "كاش",
+                  icon: <Banknote size={18} />,
+                  cls: "green",
+                },
                 { id: "visa", label: "فيزا", icon: <CreditCard size={18} /> },
-                { id: "installment", label: "تقسيط", icon: <Repeat size={18} /> },
+                {
+                  id: "installment",
+                  label: "تقسيط",
+                  icon: <Repeat size={18} />,
+                },
               ].map((m) => (
                 <button
                   key={m.id}
@@ -1000,41 +1427,139 @@ const EditBill = ({ invoiceId: initialInvoiceId, onBack, showToast }) => {
             </div>
 
             {paymentMethod === "installment" && (
-              <div className="ei-installment-box">
-                <div className="ei-installment-label">المبلغ المدفوع مقدماً</div>
-                <input
-                  type="number"
-                  value={paidAmount}
-                  className="ei-installment-input"
-                  onChange={(e) => setPaidAmount(e.target.value)}
-                />
-                <div className="ei-remaining-row">
-                  <span className="lbl">المتبقي على العميل</span>
-                  <span className="val">{remaining.toFixed(2)} ج.م</span>
+              <>
+                <div className="ei-installment-box">
+                  <div className="ei-installment-label">
+                    المبلغ المدفوع مقدماً
+                  </div>
+                  <input
+                    type="number"
+                    value={paidAmount}
+                    className="ei-installment-input"
+                    onChange={(e) => {
+                      let value = parseFloat(e.target.value) || 0;
+                      if (value < 0) value = 0;
+                      if (value > maxAllowedDownPayment) {
+                        showToast?.(
+                          `لا يمكن أن يزيد المبلغ المدفوع عن المتبقي الفعلي (${maxAllowedDownPayment.toFixed(2)} ج.م)`,
+                          "warning"
+                        );
+                        return;
+                      }
+                      setPaidAmount(value);
+                    }}
+                    min="0"
+                    max={maxAllowedDownPayment}
+                    step="0.01"
+                  />
+                  <div className="ei-remaining-row">
+                    <span className="lbl">المتبقي على العميل</span>
+                    <span className="val">{remaining.toFixed(2)} ج.م</span>
+                  </div>
+                  {paidAmount > finalTotal && (
+                    <div
+                      style={{
+                        fontSize: "11px",
+                        color: "var(--red)",
+                        marginTop: "5px",
+                      }}
+                    >
+                      ⚠️ المبلغ المدفوع أكبر من الإجمالي
+                    </div>
+                  )}
                 </div>
-              </div>
+
+                {/* سجل التحصيلات (المدفوعات السابقة) */}
+                {paymentHistory.length > 0 && (
+                  <div className="ei-payment-history">
+                    <div
+                      className="ei-payment-label"
+                      style={{ marginTop: "12px" }}
+                    >
+                      <Clock size={14} /> سجل التحصيلات
+                    </div>
+                    <div style={{ overflowX: "auto", fontSize: "12px" }}>
+                      <table className="ei-table" style={{ minWidth: "280px" }}>
+                        <thead>
+                          <tr>
+                            <th>#</th>
+                            <th>تاريخ الدفع</th>
+                            <th>المبلغ المدفوع</th>
+                            <th>ملاحظات</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {paymentHistory.map((p, idx) => (
+                            <tr key={p.id}>
+                              <td style={{ width: "30px" }}>{idx + 1}</td>
+                              <td>
+                                {new Date(p.payment_date).toLocaleDateString(
+                                  "ar-EG"
+                                )}
+                              </td>
+                              <td
+                                style={{ color: "#34d399", fontWeight: "bold" }}
+                              >
+                                +{p.amount_paid.toLocaleString()} ج.م
+                              </td>
+                              <td
+                                style={{
+                                  fontSize: "11px",
+                                  color: "var(--text3)",
+                                }}
+                              >
+                                {p.note ||
+                                  (idx === 0 ? "دفعة مقدمة" : "تحصيل قسط")}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
 
           <div className="ei-summary-footer">
-            <div style={{ display: "flex", gap: 8, marginTop: 10, flexDirection: "column" }}>
-              <button className="ei-btn ei-btn-save" onClick={() => setShowConfirm(true)} disabled={saving} style={{ width: "100%" }}>
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                marginTop: 10,
+                flexDirection: "column",
+              }}
+            >
+              <button
+                className="ei-btn ei-btn-save"
+                onClick={() => setShowConfirm(true)}
+                disabled={saving || isSaveDisabled()}
+                style={{ width: "100%", opacity: isSaveDisabled() ? 0.5 : 1 }}
+              >
                 <Save size={17} />
                 {saving ? "جاري الحفظ…" : "حفظ التعديلات"}
               </button>
               <div style={{ display: "flex", gap: 8 }}>
-                <button 
-                  className="ei-btn ei-btn-secondary" 
+                <button
+                  className="ei-btn ei-btn-secondary"
                   style={{ flex: 1 }}
                   onClick={() => {
                     setPrintMode("save_only");
                     setShowConfirm(true);
                   }}
-                  disabled={saving}
+                  disabled={saving || isSaveDisabled()}
                 >
                   <Save size={15} /> حفظ بدون طباعة
                 </button>
-                <button className="ei-btn ei-btn-ghost" style={{ flex: 1 }} onClick={() => { setActiveInvoiceId(null); setInvoiceInput(""); }}>
+                <button
+                  className="ei-btn ei-btn-ghost"
+                  style={{ flex: 1 }}
+                  onClick={() => {
+                    setActiveInvoiceId(null);
+                    setInvoiceInput("");
+                  }}
+                >
                   <X size={14} /> إلغاء
                 </button>
               </div>
@@ -1048,26 +1573,45 @@ const EditBill = ({ invoiceId: initialInvoiceId, onBack, showToast }) => {
         <div className="ei-modal-overlay" onClick={() => setDeleteTarget(null)}>
           <div className="ei-modal" onClick={(e) => e.stopPropagation()}>
             <div className="ei-modal-header">
-              <div className="ei-modal-icon red"><AlertTriangle size={20} /></div>
+              <div className="ei-modal-icon red">
+                <AlertTriangle size={20} />
+              </div>
               <div>
                 <div className="ei-modal-title">حذف الصنف</div>
-                <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>هذا الإجراء سيزيل الصنف من الفاتورة</div>
+                <div
+                  style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}
+                >
+                  هذا الإجراء سيزيل الصنف من الفاتورة
+                </div>
               </div>
             </div>
             <div className="ei-modal-body">
               <div style={{ fontSize: 14, color: "var(--text2)" }}>
-                هل تريد حذف <strong style={{ color: "var(--text)" }}>{deleteTarget.name}</strong> من الفاتورة؟
+                هل تريد حذف{" "}
+                <strong style={{ color: "var(--text)" }}>
+                  {deleteTarget.name}
+                </strong>{" "}
+                من الفاتورة؟
               </div>
             </div>
             <div className="ei-modal-footer">
               <button
                 className="ei-btn ei-btn-danger"
                 style={{ flex: 2, justifyContent: "center" }}
-                onClick={() => { setCart(cart.filter((i) => i.cartKey !== deleteTarget.cartKey)); setDeleteTarget(null); }}
+                onClick={() => {
+                  setCart(
+                    cart.filter((i) => i.cartKey !== deleteTarget.cartKey)
+                  );
+                  setDeleteTarget(null);
+                }}
               >
                 <Trash2 size={14} /> نعم، احذف
               </button>
-              <button className="ei-btn ei-btn-ghost" style={{ flex: 1, justifyContent: "center" }} onClick={() => setDeleteTarget(null)}>
+              <button
+                className="ei-btn ei-btn-ghost"
+                style={{ flex: 1, justifyContent: "center" }}
+                onClick={() => setDeleteTarget(null)}
+              >
                 إلغاء
               </button>
             </div>
@@ -1080,49 +1624,113 @@ const EditBill = ({ invoiceId: initialInvoiceId, onBack, showToast }) => {
         <div className="ei-modal-overlay" onClick={() => setShowConfirm(false)}>
           <div className="ei-modal" onClick={(e) => e.stopPropagation()}>
             <div className="ei-modal-header">
-              <div className="ei-modal-icon green"><CheckCircle2 size={20} /></div>
+              <div className="ei-modal-icon green">
+                <CheckCircle2 size={20} />
+              </div>
               <div>
                 <div className="ei-modal-title">تأكيد حفظ التعديلات</div>
-                <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>مراجعة البيانات قبل الحفظ</div>
+                <div
+                  style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}
+                >
+                  مراجعة البيانات قبل الحفظ
+                </div>
               </div>
             </div>
             <div className="ei-modal-body">
               {[
                 { lbl: "عدد الأصناف", val: `${cart.length} صنف` },
-                { lbl: "البائع", val: seller?.name || invoice?.seller_name || "—" },
+                {
+                  lbl: "البائع",
+                  val: seller?.name || invoice?.seller_name || "—",
+                },
                 { lbl: "العميل", val: customer.name || "—" },
-                { lbl: "الإجمالي قبل الخصم", val: `${totalBefore.toFixed(2)} ج.م` },
-                ...(discAmt > 0 ? [{ lbl: "الخصم", val: `− ${discAmt.toFixed(2)} ج.م`, color: "var(--red)" }] : []),
-                { lbl: "طريقة الدفع", val: { cash: "💵 كاش", visa: "💳 فيزا", installment: "📅 تقسيط" }[paymentMethod] },
-                ...(paymentMethod === "installment" ? [
-                  { lbl: "المدفوع", val: `${actualPaid.toFixed(2)} ج.م` },
-                  { lbl: "المتبقي", val: `${remaining.toFixed(2)} ج.م`, color: "var(--amber)" },
-                ] : []),
+                {
+                  lbl: "الإجمالي قبل الخصم",
+                  val: `${totalBefore.toFixed(2)} ج.م`,
+                },
+                ...(discAmt > 0
+                  ? [
+                      {
+                        lbl: "الخصم",
+                        val: `− ${discAmt.toFixed(2)} ج.م`,
+                        color: "var(--red)",
+                      },
+                    ]
+                  : []),
+                {
+                  lbl: "طريقة الدفع",
+                  val: {
+                    cash: "💵 كاش",
+                    visa: "💳 فيزا",
+                    installment: "📅 تقسيط",
+                  }[paymentMethod],
+                },
+                ...(paymentMethod === "installment"
+                  ? [
+                      {
+                        lbl: "المبلغ المدفوع (مقدم)",
+                        val: `${parseFloat(paidAmount || 0).toFixed(2)} ج.م`,
+                      },
+                      {
+                        lbl: "إجمالي المحصل",
+                        val: `${totalPaid.toFixed(2)} ج.م`,
+                        color: "var(--green)",
+                      },
+                      {
+                        lbl: "المتبقي",
+                        val: `${remaining.toFixed(2)} ج.م`,
+                        color: "var(--amber)",
+                      },
+                    ]
+                  : []),
               ].map((row, i) => (
-                <div key={i} className="ei-calc-row" style={{ borderBottom: "1px solid var(--border)", paddingBottom: 8, marginBottom: 2 }}>
+                <div
+                  key={i}
+                  className="ei-calc-row"
+                  style={{
+                    borderBottom: "1px solid var(--border)",
+                    paddingBottom: 8,
+                    marginBottom: 2,
+                  }}
+                >
                   <span className="lbl">{row.lbl}</span>
-                  <span className="val" style={{ color: row.color }}>{row.val}</span>
+                  <span className="val" style={{ color: row.color }}>
+                    {row.val}
+                  </span>
                 </div>
               ))}
-              <div className="ei-calc-row ei-calc-total" style={{ marginTop: 4 }}>
+              <div
+                className="ei-calc-row ei-calc-total"
+                style={{ marginTop: 4 }}
+              >
                 <span className="lbl">الصافي النهائي</span>
                 <span className="val">{finalTotal.toFixed(2)} ج.م</span>
               </div>
               <div className="ei-warning-box">
-                <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+                <AlertTriangle
+                  size={14}
+                  style={{ flexShrink: 0, marginTop: 1 }}
+                />
                 سيتم تحديث المخزون تلقائياً بناءً على التغييرات في الكميات.
               </div>
             </div>
             <div className="ei-modal-footer">
-              <button 
-                className="ei-btn ei-btn-primary" 
-                style={{ flex: 2, justifyContent: "center" }} 
-                onClick={() => saveEdits(printMode !== "save_only")} 
+              <button
+                className="ei-btn ei-btn-primary"
+                style={{ flex: 2, justifyContent: "center" }}
+                onClick={() => saveEdits(printMode !== "save_only")}
                 disabled={saving}
               >
                 <Save size={15} /> {saving ? "جاري الحفظ…" : "تأكيد الحفظ"}
               </button>
-              <button className="ei-btn ei-btn-ghost" style={{ flex: 1, justifyContent: "center" }} onClick={() => { setShowConfirm(false); setPrintMode(null); }}>
+              <button
+                className="ei-btn ei-btn-ghost"
+                style={{ flex: 1, justifyContent: "center" }}
+                onClick={() => {
+                  setShowConfirm(false);
+                  setPrintMode(null);
+                }}
+              >
                 إلغاء
               </button>
             </div>
@@ -1132,60 +1740,97 @@ const EditBill = ({ invoiceId: initialInvoiceId, onBack, showToast }) => {
 
       {/* Seller Selection Modal */}
       {showSellerModal && (
-        <div className="ei-modal-overlay" onClick={() => setShowSellerModal(false)}>
-          <div className="ei-modal" style={{ maxWidth: "400px" }} onClick={(e) => e.stopPropagation()}>
+        <div
+          className="ei-modal-overlay"
+          onClick={() => setShowSellerModal(false)}
+        >
+          <div
+            className="ei-modal"
+            style={{ maxWidth: "400px" }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="ei-modal-header">
-              <div className="ei-modal-icon"><Users size={20} /></div>
+              <div className="ei-modal-icon">
+                <Users size={20} />
+              </div>
               <div>
                 <div className="ei-modal-title">تغيير البائع / الكاشير</div>
-                <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>اختر البائع لهذه الفاتورة</div>
+                <div
+                  style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}
+                >
+                  اختر البائع لهذه الفاتورة
+                </div>
               </div>
             </div>
             <div className="ei-modal-body">
               {employeesList.length === 0 ? (
-                <p style={{ textAlign: "center", padding: "20px", color: "var(--text3)" }}>
+                <p
+                  style={{
+                    textAlign: "center",
+                    padding: "20px",
+                    color: "var(--text3)",
+                  }}
+                >
                   لا يوجد موظفون نشطون
                 </p>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "8px",
+                  }}
+                >
                   <select
                     className="premium-select"
                     style={{ padding: "12px", fontSize: "14px", width: "100%" }}
                     onChange={(e) => {
-                      const selected = employeesList.find(emp => emp.id === parseInt(e.target.value));
+                      const selected = employeesList.find(
+                        (emp) => emp.id === parseInt(e.target.value)
+                      );
                       if (selected) selectSeller(selected);
                     }}
                     defaultValue=""
                   >
-                    <option value="" disabled>-- اختر البائع --</option>
+                    <option value="" disabled>
+                      -- اختر البائع --
+                    </option>
                     {employeesList.map((emp) => (
                       <option key={emp.id} value={emp.id}>
-                        {emp.name} - عمولة: {emp.commission_rate || 0}% {emp.total_sales > 0 ? `| إجمالي المبيعات: ${emp.total_sales.toFixed(2)} ج.م` : ''}
+                        {emp.name} - عمولة: {emp.commission_rate || 0}%{" "}
+                        {emp.total_sales > 0
+                          ? `| إجمالي المبيعات: ${emp.total_sales.toFixed(2)} ج.م`
+                          : ""}
                       </option>
                     ))}
                   </select>
-                  
-                  <div style={{ 
-                    background: "var(--surface2)", 
-                    padding: "10px", 
-                    borderRadius: "6px", 
-                    fontSize: "11px",
-                    color: "var(--text3)"
-                  }}>
+
+                  <div
+                    style={{
+                      background: "var(--surface2)",
+                      padding: "10px",
+                      borderRadius: "6px",
+                      fontSize: "11px",
+                      color: "var(--text3)",
+                    }}
+                  >
                     <span>💡 تغيير البائع سيؤثر على حساب العمولة</span>
                   </div>
                 </div>
               )}
             </div>
             <div className="ei-modal-footer">
-              <button className="ei-btn ei-btn-ghost" style={{ flex: 1, justifyContent: "center" }} onClick={() => setShowSellerModal(false)}>
+              <button
+                className="ei-btn ei-btn-ghost"
+                style={{ flex: 1, justifyContent: "center" }}
+                onClick={() => setShowSellerModal(false)}
+              >
                 إلغاء
               </button>
             </div>
           </div>
         </div>
       )}
-
     </div>
   );
 };

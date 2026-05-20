@@ -254,6 +254,33 @@ export const getDb = async () => {
       );`
     ];
 
+     try {
+      const columns = await db.select("PRAGMA table_info(installment_plan)");
+      const hasAmountDue = columns.some(col => col.name === 'amount_due');
+      if (!hasAmountDue) {
+        await db.execute("ALTER TABLE installment_plan ADD COLUMN amount_due REAL DEFAULT 0");
+        console.log("✅ تم إضافة عمود amount_due إلى جدول installment_plan");
+      }
+      const hasStatus = columns.some(col => col.name === 'status');
+      if (!hasStatus) {
+        await db.execute("ALTER TABLE installment_plan ADD COLUMN status TEXT DEFAULT 'pending'");
+        console.log("✅ تم إضافة عمود status إلى جدول installment_plan");
+      }
+    } catch (err) {
+      console.error("خطأ في تحديث هيكل جدول الأقساط:", err);
+    }
+    // التأكد من وجود عمود payment_date في installment_plan
+try {
+  const columnsIp = await db.select("PRAGMA table_info(installment_plan)");
+  const hasPaymentDate = columnsIp.some(col => col.name === 'payment_date');
+  if (!hasPaymentDate) {
+    await db.execute("ALTER TABLE installment_plan ADD COLUMN payment_date TIMESTAMP");
+    console.log("✅ تم إضافة عمود payment_date إلى جدول installment_plan");
+  }
+} catch (err) {
+  console.error("خطأ في تحديث هيكل جدول الأقساط (payment_date):", err);
+}
+
     // 3. التحقق من صحة المصفوفة وتنفيذ إنشاء الجداول
     if (tables && Array.isArray(tables) && tables.length > 0) {
       for (const table of tables) {

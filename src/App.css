@@ -3466,7 +3466,87 @@ input:checked + .slider:before {
   color: white;
   background-color: #2e59d9;
 }
+.text-center{
+  text-align: center !important;
+}
+.pending-badge {
+  background-color: #ef4444;
+  color: white;
+  border-radius: 9999px;
+  padding: 0px 8px;
+  font-size: 11px;
+  font-weight: bold;
+  margin-right: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+}
 
+.pending-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+.pending-card:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+.pending-info {
+  display: flex;
+  gap: 16px;
+  align-items: baseline;
+}
+.pending-num {
+  font-weight: bold;
+  color: #f59e0b;
+}
+.pending-customer {
+  color: white;
+}
+.pending-date {
+  font-size: 12px;
+  color: #94a3b8;
+}
+.pending-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.pending-total {
+  font-weight: bold;
+  color: #34d399;
+}
+.pending-resume-btn {
+  background: #3b82f6;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: bold;
+}
+.pending-cancel-btn {
+  background: rgba(239, 68, 68, 0.2);
+  border: none;
+  color: #ef4444;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: 0.2s;
+}
+.pending-cancel-btn:hover {
+  background: rgba(239, 68, 68, 0.4);
+}
 .btn-secondary {
   display: flex;
   align-items: center;

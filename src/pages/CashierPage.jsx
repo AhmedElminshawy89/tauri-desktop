@@ -32,7 +32,6 @@ const getNextInvoiceNumber = async (db) => {
     const rows = await db.select(
       "SELECT invoice_number FROM invoices WHERE status IN ('completed', 'pending') ORDER BY id DESC LIMIT 1"
     );
-
     if (rows.length > 0 && rows[0].invoice_number) {
       const lastNum = parseInt(rows[0].invoice_number, 10);
       if (!isNaN(lastNum)) {
@@ -56,30 +55,30 @@ const updateEmployeeSales = async (db, employeeId, saleAmount, commissionAmount)
 
     await db.execute(
       `UPDATE employees SET 
-        total_sales = COALESCE(total_sales, 0) + $1,
-        last_sale_date = $2
-       WHERE id = $3`,
+        total_sales = COALESCE(total_sales, 0) + ?,
+        last_sale_date = ?
+       WHERE id = ?`,
       [saleAmount, today, employeeId]
     );
 
     const existing = await db.select(
-      "SELECT id FROM employee_sales_stats WHERE employee_id = $1 AND month = $2 AND year = $3",
+      "SELECT id FROM employee_sales_stats WHERE employee_id = ? AND month = ? AND year = ?",
       [employeeId, currentMonth, currentYear]
     );
 
     if (existing && existing.length > 0) {
       await db.execute(
         `UPDATE employee_sales_stats SET 
-          total_sales = total_sales + $1,
+          total_sales = total_sales + ?,
           invoice_count = invoice_count + 1,
-          total_commission = total_commission + $2
-         WHERE employee_id = $3 AND month = $4 AND year = $5`,
+          total_commission = total_commission + ?
+         WHERE employee_id = ? AND month = ? AND year = ?`,
         [saleAmount, commissionAmount, employeeId, currentMonth, currentYear]
       );
     } else {
       await db.execute(
         `INSERT INTO employee_sales_stats (employee_id, month, year, total_sales, invoice_count, total_commission)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
+         VALUES (?, ?, ?, ?, ?, ?)`,
         [employeeId, currentMonth, currentYear, saleAmount, 1, commissionAmount]
       );
     }
@@ -209,6 +208,7 @@ const CashierPage = ({ showToast }) => {
   const [highlightRow, setHighlightRow] = useState(null);
   const [currentSeller, setCurrentSeller] = useState(null);
   const [employeesList, setEmployeesList] = useState([]);
+  const [employeesLoading, setEmployeesLoading] = useState(false);
   const [showSellerModal, setShowSellerModal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [printMode, setPrintMode] = useState(null);
@@ -217,6 +217,7 @@ const CashierPage = ({ showToast }) => {
   const receiptRef = useRef(null);
 
   const loadEmployees = async () => {
+    setEmployeesLoading(true);
     try {
       const db = await getDb();
       const rows = await db.select(
@@ -227,7 +228,10 @@ const CashierPage = ({ showToast }) => {
       );
       setEmployeesList(rows || []);
     } catch (e) {
-      console.warn(e);
+      console.error("Error loading employees:", e);
+      showToast?.(`خطأ في تحميل الموظفين: ${e.message}`, "error");
+    } finally {
+      setEmployeesLoading(false);
     }
   };
 
@@ -237,7 +241,7 @@ const CashierPage = ({ showToast }) => {
       const today = new Date().toISOString().split("T")[0];
       const rows = await db.select(
         `SELECT COUNT(*) as cnt, COALESCE(SUM(total_after_discount),0) as total
-         FROM invoices WHERE status='completed' AND date(created_at) = date($1)`,
+         FROM invoices WHERE status='completed' AND date(created_at) = date(?)`,
         [today]
       );
       if (rows && rows[0]) {
@@ -251,17 +255,24 @@ const CashierPage = ({ showToast }) => {
     }
   }, []);
 
+  // ✅ تحميل الفواتير المعلقة - النسخة المحسنة
   const loadPending = useCallback(async () => {
     try {
       const db = await getDb();
       const rows = await db.select(
-        "SELECT * FROM invoices WHERE status='pending' ORDER BY id DESC LIMIT 30"
+        "SELECT * FROM invoices WHERE status = ? ORDER BY id DESC LIMIT 30",
+        ["pending"]
       );
+      console.log("📋 Pending invoices loaded:", rows);
       setPendingList(rows || []);
+      if (rows.length === 0 && showToast) {
+        // showToast("لا توجد فواتير معلقة", "info");
+      }
     } catch (e) {
-      console.warn(e);
+      console.error("❌ Error loading pending invoices:", e);
+      if (showToast) showToast(`خطأ في تحميل الفواتير المعلقة: ${e.message}`, "error");
     }
-  }, []);
+  }, [showToast]);
 
   useEffect(() => {
     try {
@@ -375,9 +386,9 @@ const CashierPage = ({ showToast }) => {
             pv.id AS variant_id, pv.color, pv.size, pv.stock, pv.variant_barcode
          FROM products p
          LEFT JOIN product_variants pv ON pv.product_id = p.id
-         WHERE (p.name LIKE $1 OR p.barcode = $2 OR pv.variant_barcode = $2)
+         WHERE (p.name LIKE ? OR p.barcode = ? OR pv.variant_barcode = ?)
          LIMIT 15`,
-        [`%${q}%`, q]
+        [`%${q}%`, q, q]
       );
       setSearchResults(rows || []);
 
@@ -479,13 +490,13 @@ const CashierPage = ({ showToast }) => {
       try {
         rows = await db.select(
           `SELECT id AS customer_id, name AS customer_name, phone AS customer_phone, address AS customer_address
-           FROM customers WHERE name LIKE $1 LIMIT 6`,
+           FROM customers WHERE name LIKE ? LIMIT 6`,
           [`%${name}%`]
         );
       } catch {
         rows = await db.select(
           `SELECT DISTINCT customer_name, customer_phone, customer_address
-           FROM invoices WHERE customer_name LIKE $1 LIMIT 6`,
+           FROM invoices WHERE customer_name LIKE ? LIMIT 6`,
           [`%${name}%`]
         );
       }
@@ -521,7 +532,7 @@ const CashierPage = ({ showToast }) => {
     try {
       const db = await getDb();
       const existing = await db.select(
-        "SELECT id FROM customers WHERE name = $1 OR phone = $2",
+        "SELECT id FROM customers WHERE name = ? OR phone = ?",
         [customer.name.trim(), customer.phone || ""]
       );
 
@@ -532,7 +543,7 @@ const CashierPage = ({ showToast }) => {
       }
 
       await db.execute(
-        "INSERT INTO customers (name, phone, address, points) VALUES ($1, $2, $3, $4)",
+        "INSERT INTO customers (name, phone, address, points) VALUES (?, ?, ?, ?)",
         [customer.name.trim(), customer.phone || "", customer.address || "", 0]
       );
 
@@ -605,7 +616,7 @@ const CashierPage = ({ showToast }) => {
               </thead>
               <tbody>
                 ${cart.map(item => `
-                  <tr>
+                  <td>
                     <td>${item.name}${item.size ? ` (${item.size})` : ''}${item.color ? ` - ${item.color}` : ''}</td>
                     <td style="text-align: center;">${item.quantity}</td>
                     <td style="text-align: left;">${item.sale_price.toFixed(2)}</td>
@@ -664,167 +675,8 @@ const CashierPage = ({ showToast }) => {
     }
   };
 
-// في CashierPage.jsx، أضف هذه الدالة لحفظ الأقساط
-const saveInstallmentPlan = async (db, invoiceId, installmentPlan, paidAmount, finalTotal) => {
-  try {
-    // حذف أي خطة أقساط قديمة
-    await db.execute("DELETE FROM installment_plan WHERE invoice_id = $1", [invoiceId]);
-    
-    if (installmentPlan && installmentPlan.length > 0) {
-      for (const plan of installmentPlan) {
-        await db.execute(
-          `INSERT INTO installment_plan (invoice_id, due_date, amount_due, status) 
-           VALUES ($1, $2, $3, $4)`,
-          [invoiceId, plan.due_date, plan.amount_due, plan.status || "pending"]
-        );
-      }
-      console.log(`✅ Saved ${installmentPlan.length} installment plans for invoice ${invoiceId}`);
-    }
-    
-    // تسجيل الدفعة الأولى (المقدم) في سجل الدفعات
-    if (paidAmount > 0) {
-      await db.execute(
-        `INSERT INTO installment_payments (invoice_id, amount_paid, payment_method, payment_date, notes) 
-         VALUES ($1, $2, $3, $4, $5)`,
-        [invoiceId, paidAmount, "cash", new Date().toISOString(), "دفعة مقدمة (تقسيط)"]
-      );
-    }
-  } catch (error) {
-    console.error("Error saving installment plan:", error);
-  }
-};
-
-// تعديل دالة saveInvoice
-const saveInvoice = async (paymentData = null, shouldPrint = true) => {
-  if (cart.length === 0) {
-    showToast("السلة فارغة", "error");
-    return false;
-  }
-
-  if (!currentSeller) {
-    showToast("الرجاء اختيار البائع أولاً", "warning");
-    setShowSellerModal(true);
-    return false;
-  }
-
-  setIsLoading(true);
-  try {
-    const db = await getDb();
-    
-    if (resumedInvoiceId) {
-      await db.execute("DELETE FROM invoice_items WHERE invoice_id = $1", [resumedInvoiceId]);
-      await db.execute("DELETE FROM invoices WHERE id = $1", [resumedInvoiceId]);
-    }
-
-    const invoiceNumber = await getNextInvoiceNumber(db);
-    
-    const method = paymentData?.method || "cash";
-    const paidAmt = paymentData?.paid_amount ?? finalTotal;
-    const remainingAmount = paymentData?.remaining_amount ?? (method === "installment" ? finalTotal - paidAmt : 0);
-    const installmentsCount = paymentData?.installments_count ?? 0;
-    const installmentPlan = paymentData?.installment_plan || [];
-    
-    let finalCustomerId = customerId;
-    if (!finalCustomerId && customer.name.trim() && customer.name !== "عميل نقدي") {
-      try {
-        const existing = await db.select(
-          "SELECT id FROM customers WHERE name = $1 LIMIT 1",
-          [customer.name.trim()]
-        );
-        if (existing.length) {
-          finalCustomerId = existing[0].id;
-        } else {
-          await db.execute(
-            "INSERT INTO customers (name, phone, address) VALUES ($1, $2, $3)",
-            [customer.name.trim(), customer.phone || "", customer.address || ""]
-          );
-          const [res] = await db.select("SELECT last_insert_rowid() AS id");
-          finalCustomerId = res?.id;
-        }
-      } catch {
-        // customers table may not exist
-      }
-    }
-
-    const result = await db.execute(
-      `INSERT INTO invoices (
-        invoice_number, customer_name, customer_phone, customer_address, customer_id,
-        total_before_discount, discount_value, discount_type, total_after_discount, 
-        status, payment_method, paid_amount, remaining_amount, installments_count,
-        seller_id, seller_name, commission_amount
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
-      [
-        invoiceNumber,
-        customer.name,
-        customer.phone || "",
-        customer.address || "",
-        finalCustomerId,
-        totalBefore,
-        discount.value || 0,
-        discount.type,
-        finalTotal,
-        "completed",
-        method,
-        paidAmt,
-        remainingAmount,
-        installmentsCount,
-        currentSeller.id,
-        currentSeller.name,
-        commissionAmount
-      ]
-    );
-
-    const invoiceId = result.lastInsertId;
-
-    // حفظ الأصناف
-    for (const item of cart) {
-      await db.execute(
-        `INSERT INTO invoice_items (invoice_id, product_id, variant_id, product_name, quantity, unit_price, total_price, cost_price_at_sale)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [invoiceId, item.id, item.variant_id, item.name, item.quantity, item.sale_price, item.quantity * item.sale_price, item.cost_price || 0]
-      );
-
-      const table = item.variant_id ? "product_variants" : "products";
-      await db.execute(`UPDATE ${table} SET stock = stock - $1 WHERE id = $2`, [item.quantity, item.variant_id || item.id]);
-    }
-
-    // حفظ خطة الأقساط إذا كانت الطريقة تقسيط
-    if (method === "installment" && installmentPlan.length > 0) {
-      await saveInstallmentPlan(db, invoiceId, installmentPlan, paidAmt, finalTotal);
-    }
-
-    await updateEmployeeSales(db, currentSeller.id, finalTotal, commissionAmount);
-
-    showToast("تم حفظ الفاتورة بنجاح", "success");
-
-    if (shouldPrint) {
-      try {
-        printReceipt();
-      } catch (error) {
-        console.error("Error printing:", error);
-        showToast("تم حفظ الفاتورة ولكن حدث خطأ في الطباعة", "warning");
-      }
-    }
-    
-    localStorage.setItem('invoices_updated', Date.now().toString());
-    
-    await resetPage();
-    await loadDailySummary();
-    await loadPending();
-    return true;
-
-  } catch (err) {
-    console.error(err);
-    showToast("خطأ في الحفظ: " + err.message, "error");
-    return false;
-  } finally {
-    setIsLoading(false);
-    setPrintMode(null);
-    setModalType(null);
-  }
-};
-
-  const savePendingInvoice = async () => {
+  // ─── حفظ الفاتورة (بدون جدول أقساط) ──────────────────────────────────────
+  const saveInvoice = async (paymentData = null, shouldPrint = true) => {
     if (cart.length === 0) {
       showToast("السلة فارغة", "error");
       return false;
@@ -841,34 +693,45 @@ const saveInvoice = async (paymentData = null, shouldPrint = true) => {
       const db = await getDb();
       
       if (resumedInvoiceId) {
-        await db.execute("DELETE FROM invoice_items WHERE invoice_id = $1", [resumedInvoiceId]);
-        await db.execute("DELETE FROM invoices WHERE id = $1", [resumedInvoiceId]);
+        await db.execute("DELETE FROM invoice_items WHERE invoice_id = ?", [resumedInvoiceId]);
+        await db.execute("DELETE FROM invoices WHERE id = ?", [resumedInvoiceId]);
       }
 
       const invoiceNumber = await getNextInvoiceNumber(db);
+      
+      const method = paymentData?.method || "cash";
+      const paidAmt = paymentData?.paid_amount ?? finalTotal;
+      const remainingAmount = paymentData?.remaining_amount ?? (method === "installment" ? finalTotal - paidAmt : 0);
       
       let finalCustomerId = customerId;
       if (!finalCustomerId && customer.name.trim() && customer.name !== "عميل نقدي") {
         try {
           const existing = await db.select(
-            "SELECT id FROM customers WHERE name = $1 LIMIT 1",
+            "SELECT id FROM customers WHERE name = ? LIMIT 1",
             [customer.name.trim()]
           );
           if (existing.length) {
             finalCustomerId = existing[0].id;
+          } else {
+            await db.execute(
+              "INSERT INTO customers (name, phone, address) VALUES (?, ?, ?)",
+              [customer.name.trim(), customer.phone || "", customer.address || ""]
+            );
+            const [res] = await db.select("SELECT last_insert_rowid() AS id");
+            finalCustomerId = res?.id;
           }
         } catch {
           // customers table may not exist
         }
       }
 
-      await db.execute(
+      const result = await db.execute(
         `INSERT INTO invoices (
           invoice_number, customer_name, customer_phone, customer_address, customer_id,
           total_before_discount, discount_value, discount_type, total_after_discount, 
           status, payment_method, paid_amount, remaining_amount, installments_count,
           seller_id, seller_name, commission_amount
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           invoiceNumber,
           customer.name,
@@ -879,25 +742,60 @@ const saveInvoice = async (paymentData = null, shouldPrint = true) => {
           discount.value || 0,
           discount.type,
           finalTotal,
-          "pending",
-          "cash",
-          finalTotal,
+          "completed",
+          method,
+          paidAmt,
+          remainingAmount,
           0,
-          1,
           currentSeller.id,
           currentSeller.name,
           commissionAmount
         ]
       );
 
-      showToast("تم تعليق الفاتورة بنجاح", "success");
-      
-      resetCartAndCustomer();
-      const nextNumber = await getNextInvoiceNumber(db);
-      setInvoiceNum(nextNumber);
-      localStorage.setItem("pos_invoice_num", nextNumber);
-      setModalType(null);
+      const invoiceId = result.lastInsertId;
 
+      for (const item of cart) {
+        await db.execute(
+          `INSERT INTO invoice_items (invoice_id, product_id, variant_id, product_name, quantity, unit_price, total_price, cost_price_at_sale)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [invoiceId, item.id, item.variant_id, item.name, item.quantity, item.sale_price, item.quantity * item.sale_price, item.cost_price || 0]
+        );
+
+        const table = item.variant_id ? "product_variants" : "products";
+        await db.execute(`UPDATE ${table} SET stock = stock - ? WHERE id = ?`, [item.quantity, item.variant_id || item.id]);
+      }
+
+      if (method === "installment" && paidAmt > 0) {
+        await db.execute(
+          `INSERT INTO installment_payments (invoice_id, customer_id, amount_paid, payment_method, transaction_type, note, payment_date)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [invoiceId, finalCustomerId, paidAmt, "cash", "installment", "دفعة مقدمة", new Date().toISOString()]
+        );
+      }
+
+      await updateEmployeeSales(db, currentSeller.id, finalTotal, commissionAmount);
+
+      showToast("تم حفظ الفاتورة بنجاح", "success");
+
+      if (shouldPrint) {
+        try {
+          printReceipt();
+        } catch (error) {
+          console.error("Error printing:", error);
+          showToast("تم حفظ الفاتورة ولكن حدث خطأ في الطباعة", "warning");
+        }
+      }
+      
+      localStorage.setItem('invoices_updated', Date.now().toString());
+      window.dispatchEvent(new CustomEvent('pendingCountUpdated'));
+      
+      // إذا كانت الفاتورة المستأنفة معلقة وتم إنهاؤها، تحديث القائمة المعلقة
+      if (resumedInvoiceId) {
+        await loadPending();
+      }
+      
+      await resetPage();
       await loadDailySummary();
       await loadPending();
       return true;
@@ -908,8 +806,115 @@ const saveInvoice = async (paymentData = null, shouldPrint = true) => {
       return false;
     } finally {
       setIsLoading(false);
+      setPrintMode(null);
+      setModalType(null);
     }
   };
+
+// استبدل دالة savePendingInvoice بالكود التالي
+const savePendingInvoice = async () => {
+  if (cart.length === 0) {
+    showToast("السلة فارغة", "error");
+    return false;
+  }
+
+  if (!currentSeller) {
+    showToast("الرجاء اختيار البائع أولاً", "warning");
+    setShowSellerModal(true);
+    return false;
+  }
+
+  setIsLoading(true);
+  try {
+    const db = await getDb();
+
+    if (resumedInvoiceId) {
+      await db.execute("DELETE FROM invoice_items WHERE invoice_id = ?", [resumedInvoiceId]);
+      await db.execute("DELETE FROM invoices WHERE id = ?", [resumedInvoiceId]);
+    }
+
+    const invoiceNumber = await getNextInvoiceNumber(db);
+
+    let finalCustomerId = customerId;
+    if (!finalCustomerId && customer.name.trim() && customer.name !== "عميل نقدي") {
+      try {
+        const existing = await db.select(
+          "SELECT id FROM customers WHERE name = ? LIMIT 1",
+          [customer.name.trim()]
+        );
+        if (existing.length) finalCustomerId = existing[0].id;
+      } catch { /* جدول العملاء قد لا يكون موجوداً */ }
+    }
+
+    // 1. إدراج الفاتورة بحالة "pending"
+    const result = await db.execute(
+      `INSERT INTO invoices (
+        invoice_number, customer_name, customer_phone, customer_address, customer_id,
+        total_before_discount, discount_value, discount_type, total_after_discount, 
+        status, payment_method, paid_amount, remaining_amount, installments_count,
+        seller_id, seller_name, commission_amount
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        invoiceNumber,
+        customer.name,
+        customer.phone || "",
+        customer.address || "",
+        finalCustomerId,
+        totalBefore,
+        discount.value || 0,
+        discount.type,
+        finalTotal,
+        "pending",
+        "cash",
+        finalTotal,
+        0,
+        1,
+        currentSeller.id,
+        currentSeller.name,
+        commissionAmount
+      ]
+    );
+
+    const invoiceId = result.lastInsertId;
+
+    // 2. ✅ حفظ الأصناف (هذا الجزء المفقود)
+    for (const item of cart) {
+      await db.execute(
+        `INSERT INTO invoice_items (invoice_id, product_id, variant_id, product_name, quantity, unit_price, total_price, cost_price_at_sale)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          invoiceId,
+          item.id,
+          item.variant_id,
+          item.name,
+          item.quantity,
+          item.sale_price,
+          item.quantity * item.sale_price,
+          item.cost_price || 0
+        ]
+      );
+    }
+
+    showToast("تم تعليق الفاتورة بنجاح", "success");
+    window.dispatchEvent(new CustomEvent('pendingCountUpdated'));
+
+    resetCartAndCustomer();
+    const nextNumber = await getNextInvoiceNumber(db);
+    setInvoiceNum(nextNumber);
+    localStorage.setItem("pos_invoice_num", nextNumber);
+    setModalType(null);
+
+    await loadDailySummary();
+    await loadPending();
+    return true;
+  } catch (err) {
+    console.error(err);
+    showToast("خطأ في الحفظ: " + err.message, "error");
+    return false;
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const resetCartAndCustomer = () => {
     setCart([]);
@@ -941,7 +946,7 @@ const saveInvoice = async (paymentData = null, shouldPrint = true) => {
          FROM invoice_items ii
          LEFT JOIN product_variants pv ON pv.id = ii.variant_id
          LEFT JOIN products p ON p.id = ii.product_id
-         WHERE ii.invoice_id = $1`,
+         WHERE ii.invoice_id = ?`,
         [inv.id]
       );
 
@@ -982,16 +987,24 @@ const saveInvoice = async (paymentData = null, shouldPrint = true) => {
   };
 
   const cancelPendingInvoice = async (inv) => {
-    try {
-      const db = await getDb();
-      await db.execute("DELETE FROM invoice_items WHERE invoice_id = $1", [inv.id]);
-      await db.execute("DELETE FROM invoices WHERE id = $1", [inv.id]);
-      showToast("تم إلغاء الفاتورة المعلقة", "success");
-      await loadPending();
-    } catch (err) {
-      showToast("خطأ في الإلغاء", "error");
-    }
-  };
+  if (!inv || !inv.id) return;
+  try {
+    const db = await getDb();
+    // حذف الأصناف أولاً
+    await db.execute("DELETE FROM invoice_items WHERE invoice_id = ?", [inv.id]);
+    // حذف الفاتورة
+    await db.execute("DELETE FROM invoices WHERE id = ?", [inv.id]);
+    showToast("تم إلغاء الفاتورة المعلقة", "success");
+    // تحديث القوائم
+    await loadPending();
+    window.dispatchEvent(new CustomEvent('pendingCountUpdated'));
+    // إغلاق المودال إذا كان مفتوحاً (اختياري)
+    setModalType(null);
+  } catch (err) {
+    console.error(err);
+    showToast("خطأ في الإلغاء: " + err.message, "error");
+  }
+};
 
   const stockColor = (stock, qty) => {
     const remaining = stock - qty;
@@ -1013,10 +1026,15 @@ const saveInvoice = async (paymentData = null, shouldPrint = true) => {
               </div>
             </div>
             <div className="ei-modal-body">
-              {employeesList.length === 0 ? (
+              {employeesList.length === 0 && !employeesLoading ? (
                 <p style={{ textAlign: "center", padding: "20px", color: "var(--text3)" }}>
                   لا يوجد موظفون نشطون. الرجاء إضافة موظفين أولاً.
                 </p>
+              ) : employeesLoading ? (
+                <div style={{ textAlign: "center", padding: "20px" }}>
+                  <RotateCcw size={24} className="ei-spinner" />
+                  <p style={{ marginTop: "8px", color: "var(--text3)" }}>جاري تحميل الموظفين...</p>
+                </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
                   <select
@@ -1035,14 +1053,7 @@ const saveInvoice = async (paymentData = null, shouldPrint = true) => {
                       </option>
                     ))}
                   </select>
-                  
-                  <div style={{ 
-                    background: "var(--surface2)", 
-                    padding: "12px", 
-                    borderRadius: "8px", 
-                    fontSize: "12px",
-                    color: "var(--text2)"
-                  }}>
+                  <div style={{ background: "var(--surface2)", padding: "12px", borderRadius: "8px", fontSize: "12px", color: "var(--text2)" }}>
                     <span>💡 اختر البائع من القائمة المنسدلة</span>
                   </div>
                 </div>
@@ -1477,7 +1488,7 @@ const saveInvoice = async (paymentData = null, shouldPrint = true) => {
         <PendingPanel
           pendingList={pendingList}
           onResume={resumeInvoice}
-          onCancel={cancelPendingInvoice}
+    onCancel={cancelPendingInvoice}   // ✅ تأكد من وجود هذا السطر
           onClose={() => setModalType(null)}
         />
       )}

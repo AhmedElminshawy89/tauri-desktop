@@ -24,6 +24,7 @@ import AttendancePage from "./pages/AttendancePage";
 import PurchasesPage from "./pages/PurchasesPage";
 import SuppliersPage from "./pages/SuppliersPage";
 import CommissionReport from "./pages/CommissionReport";
+import PendingInvoices from "./pages/PendingInvoices";
 
 function App() {
   // 1. استرجاع بيانات اليوزر من المتصفح عند التحميل لأول مرة
@@ -91,6 +92,7 @@ element={!isAuthenticated ? <Login onLogin={handleLoginSuccess} showToast={showT
           <Route path="products" element={<ProductsPage showToast={showToast} />} />
           <Route path="commission-report" element={<CommissionReport showToast={showToast} />} />
           <Route path="cashier" element={<CashierPage showToast={showToast} />} />
+<Route path="cashier/edit/:invoiceId" element={<CashierPage showToast={showToast} />} />
           <Route path="salesLog" element={<SalesLog showToast={showToast} />} />
           <Route path="returns" element={<ReturnsPage showToast={showToast} />} />
           <Route path="installments" element={<InstallmentCollection showToast={showToast} />} />
@@ -104,7 +106,7 @@ element={!isAuthenticated ? <Login onLogin={handleLoginSuccess} showToast={showT
           <Route path="editBill" element={<EditBill showToast={showToast} />} />
           <Route path="settings" element={<SettingsPage showToast={showToast} />} />
           <Route path="stats" element={<StatsPage showToast={showToast} />} />
-
+          <Route path="pending-invoices" element={<PendingInvoices showToast={showToast} />} />
           <Route path="/suppliers" element={<SuppliersPage showToast={showToast} />} />
           <Route path="/purchases" element={<PurchasesPage showToast={showToast} />} />
         </Route>

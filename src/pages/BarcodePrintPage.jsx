@@ -225,7 +225,7 @@ const BarcodePrintPage = ({ showToast }) => {
     setIsPrinting(true);
     try {
       const html = generatePrintHtml();
-      // فتح نافذة جديدة بدلاً من iframe لضمان ظهور المحتوى
+
       const printWindow = window.open('', '_blank', 'width=500,height=400');
       if (!printWindow) {
         showToast("الرجاء السماح للنوافذ المنبثقة للطباعة", "error");

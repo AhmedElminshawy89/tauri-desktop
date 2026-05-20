@@ -23,7 +23,6 @@ import {
   DollarSign,
   FileText,
   Package,
-  ArrowLeftRight,
   Edit,
   CalendarDays,
   Wallet,
@@ -31,7 +30,6 @@ import {
 import EditBill from "./EditBill";
 
 // ─── ثوابت ───────────────────────────────────────────────────────────────────
-
 const PAYMENT_MAP = {
   cash: {
     label: "كاش",
@@ -258,13 +256,9 @@ const SalesLog = ({ showToast }) => {
         [invoice.id]
       );
 
+      // جلب سجل المدفوعات (يشمل الدفعة المقدمة والأقساط)
       const paymentHistory = await db.select(
         `SELECT * FROM installment_payments WHERE invoice_id = ? ORDER BY payment_date ASC`,
-        [invoice.id]
-      );
-
-      const installmentPlan = await db.select(
-        `SELECT * FROM installment_plan WHERE invoice_id = ? ORDER BY due_date ASC`,
         [invoice.id]
       );
 
@@ -273,10 +267,14 @@ const SalesLog = ({ showToast }) => {
         0
       );
       
+      // ✅ إجمالي المحصل = مجموع كل المدفوعات (لأن الدفعة المقدمة موجودة في paymentHistory)
       const totalActualPaid = paymentHistory.reduce(
         (s, p) => s + (Number(p.amount_paid) || 0),
         0
       );
+      
+      // الدفعة المقدمة هي أول دفعة في السجل (إن وجدت) أو 0
+      const downPayment = paymentHistory.length > 0 ? paymentHistory[0].amount_paid : 0;
 
       const returnedQtyMap = {};
       returnsDetails.forEach((r) => {
@@ -306,9 +304,9 @@ const SalesLog = ({ showToast }) => {
         itemsAfterReturn: itemsAfterReturn,
         returnsDetails: returnsDetails,
         paymentHistory: paymentHistory,
-        installmentPlan: installmentPlan,
         totalReturned: totalReturned,
         totalActualPaid: totalActualPaid,
+        downPayment: downPayment,
         sellerInfo: sellerInfo,
       });
       
@@ -326,6 +324,18 @@ const SalesLog = ({ showToast }) => {
     iframe.style.height = '0px';
     iframe.style.border = 'none';
     document.body.appendChild(iframe);
+    
+    const invoiceDate = new Date(invoice.created_at).toLocaleDateString("ar-EG");
+    const totalBefore = Number(invoice.total_before_discount) || 0;
+    let discountAmount = 0;
+    if (invoice.discount_value && invoice.discount_value > 0) {
+      if (invoice.discount_type === "percent") {
+        discountAmount = (totalBefore * invoice.discount_value) / 100;
+      } else {
+        discountAmount = Number(invoice.discount_value);
+      }
+    }
+    const totalAfter = Number(invoice.total_after_discount) || 0;
     
     const html = `
       <!DOCTYPE html>
@@ -364,7 +374,7 @@ const SalesLog = ({ showToast }) => {
           
           <div style="display: flex; justify-content: space-between; font-size: 11px;">
             <span>رقم: #${invoice.invoice_number}</span>
-            <span>${new Date().toLocaleDateString("ar-EG")}</span>
+            <span>${invoiceDate}</span>
           </div>
           <div style="font-size: 11px;">العميل: ${invoice.customer_name || "عميل نقدي"}</div>
           <div style="font-size: 10px;">البائع: ${invoice.seller_name || "—"}</div>
@@ -391,20 +401,18 @@ const SalesLog = ({ showToast }) => {
           
           <div style="display: flex; justify-content: space-between;">
             <span>الإجمالي:</span>
-            <span>${(invoice.total_before_discount || 0).toFixed(2)} ج.م</span>
+            <span>${totalBefore.toFixed(2)} ج.م</span>
           </div>
-          ${(invoice.discount_value || 0) > 0 ? `
+          ${discountAmount > 0 ? `
             <div style="display: flex; justify-content: space-between;">
               <span>الخصم:</span>
-              <span>- ${invoice.discount_type === "percent" 
-                ? ((invoice.total_before_discount || 0) * invoice.discount_value / 100).toFixed(2)
-                : invoice.discount_value} ج.م</span>
+              <span>- ${discountAmount.toFixed(2)} ج.م</span>
             </div>
           ` : ''}
           
           <div class="total-row" style="display: flex; justify-content: space-between;">
             <span>الصافي:</span>
-            <span>${(invoice.total_after_discount || 0).toFixed(2)} ج.م</span>
+            <span>${totalAfter.toFixed(2)} ج.م</span>
           </div>
           
           <div class="footer">
@@ -426,60 +434,77 @@ const SalesLog = ({ showToast }) => {
     }, 100);
   };
 
-  // ─── حذف فاتورة ──────────────────────────────────────────────────────────
-  const confirmDelete = async () => {
-    if (!deleteModal.reason.trim()) {
-      if (showToast) showToast("يرجى كتابة سبب الحذف", "warning");
-      return;
+const confirmDelete = async () => {
+  if (!deleteModal.reason.trim()) {
+    if (showToast) showToast("يرجى كتابة سبب الحذف", "warning");
+    return;
+  }
+  try {
+    const db = await getDb();
+    const inv = deleteModal.invoice;
+    
+    await db.execute("BEGIN TRANSACTION");
+    
+    // 1. جلب الأصناف لحفظ نسخة في deleted_invoices
+    const items = await db.select(
+      "SELECT * FROM invoice_items WHERE invoice_id = ?",
+      [inv.id]
+    );
+    const snapshot = JSON.stringify({ items });
+
+    // 2. إدراج سجل في deleted_invoices
+    await db.execute(
+      `INSERT INTO deleted_invoices 
+       (invoice_id, invoice_number, customer_name, total_amount, reason, items_json, deleted_at) 
+       VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`,
+      [
+        inv.id,
+        inv.invoice_number,
+        inv.customer_name || "عميل نقدي",
+        inv.total_after_discount,
+        deleteModal.reason,
+        snapshot,
+      ]
+    );
+
+    // 3. حذف جميع السجلات المرتبطة يدويًا لتجنب FOREIGN KEY error
+    await db.execute("DELETE FROM invoice_items WHERE invoice_id = ?", [inv.id]);
+    await db.execute("DELETE FROM installment_payments WHERE invoice_id = ?", [inv.id]);
+    await db.execute("DELETE FROM installment_plan WHERE invoice_id = ?", [inv.id]);
+    await db.execute("DELETE FROM returns WHERE invoice_id = ?", [inv.id]);
+    
+    // 4. استرجاع المخزون (إن وجد)
+    for (const item of items) {
+      if (item.variant_id) {
+        await db.execute("UPDATE product_variants SET stock = stock + ? WHERE id = ?", [
+          item.quantity,
+          item.variant_id,
+        ]);
+      } else {
+        await db.execute("UPDATE products SET stock = stock + ? WHERE id = ?", [
+          item.quantity,
+          item.product_id,
+        ]);
+      }
     }
+    
+    // 5. حذف الفاتورة نفسها
+    await db.execute("DELETE FROM invoices WHERE id = ?", [inv.id]);
+    
+    await db.execute("COMMIT");
+
+    if (showToast) showToast("تم الحذف بنجاح", "success");
+    setDeleteModal({ show: false, invoice: null, reason: "" });
+    fetchInvoices();
+  } catch (err) {
+    console.error(err);
     try {
       const db = await getDb();
-      const inv = deleteModal.invoice;
-      const items = await db.select(
-        "SELECT * FROM invoice_items WHERE invoice_id = ?",
-        [inv.id]
-      );
-      const snapshot = JSON.stringify({ items });
-
-      await db.execute(
-        `INSERT INTO deleted_invoices 
-         (invoice_id, invoice_number, customer_name, total_amount, reason, items_json, deleted_at) 
-         VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`,
-        [
-          inv.id,
-          inv.invoice_number,
-          inv.customer_name || "عميل نقدي",
-          inv.total_after_discount,
-          deleteModal.reason,
-          snapshot,
-        ]
-      );
-
-      for (const item of items) {
-        if (item.variant_id) {
-          await db.execute("UPDATE product_variants SET stock = stock + ? WHERE id = ?", [
-            item.quantity,
-            item.variant_id,
-          ]);
-        } else {
-          await db.execute("UPDATE products SET stock = stock + ? WHERE id = ?", [
-            item.quantity,
-            item.product_id,
-          ]);
-        }
-      }
-      
-      await db.execute("DELETE FROM invoice_items WHERE invoice_id = ?", [inv.id]);
-      await db.execute("DELETE FROM invoices WHERE id = ?", [inv.id]);
-
-      if (showToast) showToast("تم الحذف بنجاح", "success");
-      setDeleteModal({ show: false, invoice: null, reason: "" });
-      fetchInvoices();
-    } catch (err) {
-      console.error(err);
-      if (showToast) showToast("خطأ في التنفيذ", "error");
-    }
-  };
+      await db.execute("ROLLBACK");
+    } catch (e) {}
+    if (showToast) showToast("خطأ في التنفيذ", "error");
+  }
+};
 
   const closeModal = () => setSelectedInvoice(null);
   const closeEditModal = () => {
@@ -505,8 +530,9 @@ const SalesLog = ({ showToast }) => {
     total: invoices.reduce((sum, inv) => sum + (inv.total_after_discount || 0), 0),
     count: invoices.length,
     completed: invoices.filter(inv => deriveStatus(inv, inv.total_returned) === "completed").length,
-    pending: invoices.filter(inv => inv.status === "pending").length,
+    pending: invoices.filter(inv => deriveStatus(inv, inv.total_returned) === "pending").length,
     returned: invoices.filter(inv => deriveStatus(inv, inv.total_returned) === "returned").length,
+    partial_returned: invoices.filter(inv => deriveStatus(inv, inv.total_returned) === "partial_returned").length,
   };
 
   useEffect(() => {
@@ -718,6 +744,7 @@ const SalesLog = ({ showToast }) => {
                   <InfoRow icon={<Users size={15} />} label="البائع" value={<span>{selectedInvoice.seller_name || selectedInvoice.sellerInfo?.name || "—"}</span>} />
                 </SectionBox>
               </div>
+
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
                 <SectionBox>
                   <SectionTitle label="الملخص المالي" icon={<DollarSign size={14} />} />
@@ -727,34 +754,33 @@ const SalesLog = ({ showToast }) => {
                   )}
                   
                   <InfoRow icon={<CheckCircle2 size={15} />} label="إجمالي بعد الخصم" value={`${(selectedInvoice.total_after_discount || 0).toLocaleString()} ج.م`} valueStyle={{ color: "#34d399" }} />
-                    <InfoRow icon={<CheckCircle2 size={15} />} label="صافي المحصل" value={`${Math.max(0, (selectedInvoice.total_after_discount || 0) - (selectedInvoice.totalReturned || 0)).toLocaleString()} ج.م`} valueStyle={{ color: "#34d399", fontSize: "16px" }} />
+                  <InfoRow icon={<CheckCircle2 size={15} />} label="صافي المحصل" value={`${Math.max(0, (selectedInvoice.total_after_discount || 0) - (selectedInvoice.totalReturned || 0)).toLocaleString()} ج.م`} valueStyle={{ color: "#34d399", fontSize: "16px" }} />
                   {(selectedInvoice.totalReturned || 0) > 0 && (
                     <InfoRow icon={<RotateCcw size={15} />} label="إجمالي المرتجعات" value={`- ${(selectedInvoice.totalReturned || 0).toLocaleString()} ج.م`} valueStyle={{ color: "#fb923c" }} />
                   )}
                   <div style={{ height: "1px", background: "rgba(255,255,255,0.08)", margin: "8px 0" }} />
-                  
-                  {/* عرض تفاصيل الدفع حسب نوعه */}
                 </SectionBox>
-                <SectionBox>
-                  <SectionTitle label="تفاصيل الدفع للاقساط" icon={<DollarSign size={14} />} />
-                  {selectedInvoice.payment_method === "installment" ? (
+
+                {selectedInvoice.payment_method === "installment" && (
+                  <SectionBox>
+                    <SectionTitle label="تفاصيل الدفع للأقساط" icon={<DollarSign size={14} />} />
                     <>
                       <InfoRow 
                         icon={<Wallet size={15} />} 
                         label="المبلغ المدفوع (مقدم)" 
-                        value={`${(selectedInvoice.paid_amount || 0).toLocaleString()} ج.م`} 
+                        value={`${(selectedInvoice.downPayment || 0).toLocaleString()} ج.م`} 
                         valueStyle={{ color: "#34d399" }} 
                       />
                       <InfoRow 
                         icon={<AlertCircle size={15} />} 
                         label="المتبقي على العميل" 
-                        value={`${Math.max(0, (selectedInvoice.total_after_discount || 0) - (selectedInvoice.paid_amount || 0) - (selectedInvoice.totalReturned || 0)).toLocaleString()} ج.م`} 
+                        value={`${Math.max(0, (selectedInvoice.total_after_discount || 0) - (selectedInvoice.totalActualPaid || 0) - (selectedInvoice.totalReturned || 0)).toLocaleString()} ج.م`} 
                         valueStyle={{ color: "#f97316", fontSize: "16px" }} 
                       />
                       <InfoRow 
                         icon={<Repeat size={15} />} 
-                        label="عدد الأقساط المتبقية" 
-                        value={`${selectedInvoice.installments_count || 0} قسط`} 
+                        label="عدد المدفوعات" 
+                        value={`${selectedInvoice.paymentHistory?.length || 0} دفعة`} 
                         valueStyle={{ color: "#60a5fa" }} 
                       />
                       <InfoRow 
@@ -763,63 +789,34 @@ const SalesLog = ({ showToast }) => {
                         value={`${(selectedInvoice.totalActualPaid || 0).toLocaleString()} ج.م`} 
                         valueStyle={{ color: "#34d399" }} 
                       />
-                      {
-                        console.log("تفاصيل الدفع:", {
-                          selectedInvoice
-                        })
-                      }
-
                     </>
-                  ) : (
-                    <InfoRow icon={<CheckCircle2 size={15} />} label="صافي المحصل" value={`${Math.max(0, (selectedInvoice.total_after_discount || 0) - (selectedInvoice.totalReturned || 0)).toLocaleString()} ج.م`} valueStyle={{ color: "#34d399", fontSize: "16px" }} />
-                  )}
-                </SectionBox>
-              </div>  
-              {/* الملخص المالي */}
+                  </SectionBox>
+                )}
+              </div>
 
-              {/* جدول الأقساط - يظهر فقط للتقسيط */}
-              {selectedInvoice.payment_method === "installment" && selectedInvoice.installmentPlan && selectedInvoice.installmentPlan.length > 0 && (
+              {/* سجل التحصيلات */}
+              {selectedInvoice.payment_method === "installment" && selectedInvoice.paymentHistory && selectedInvoice.paymentHistory.length > 0 && (
                 <div>
-                  <SectionTitle label="جدول الأقساط" color="#f97316" icon={<CalendarDays size={14} />} />
-                  <div className="table-wrapper-premium" style={{ boxShadow: "none", border: "1px solid rgba(249,115,22,0.3)" }}>
+                  <SectionTitle label="سجل التحصيلات" color="#60a5fa" icon={<Clock size={14} />} />
+                  <div className="table-wrapper-premium" style={{ boxShadow: "none", border: "1px solid rgba(96,165,250,0.3)" }}>
                     <table className="custom-table" style={{ fontSize: "13px" }}>
                       <thead>
                         <tr>
                           <th>#</th>
-                          <th>تاريخ الاستحقاق</th>
-                          <th>المبلغ المطلوب</th>
-                          <th>المبلغ المدفوع</th>
-                          <th>الحالة</th>
                           <th>تاريخ الدفع</th>
+                          <th>المبلغ المدفوع</th>
+                          <th>ملاحظات</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {selectedInvoice.installmentPlan.map((plan, idx) => {
-                          const payment = selectedInvoice.paymentHistory?.find(p => 
-                            new Date(p.payment_date).toDateString() === new Date(plan.due_date).toDateString()
-                          );
-                          const isPaid = plan.status === "paid" || payment;
-                          return (
-                            <tr key={plan.id}>
-                              <td style={{ color: "#94a3b8" }}>{idx + 1}</td>
-                              <td>{new Date(plan.due_date).toLocaleDateString("ar-EG")}</td>
-                              <td style={{ fontWeight: "700" }}>{(plan.amount_due || 0).toLocaleString()} ج.م</td>
-                              <td style={{ color: isPaid ? "#34d399" : "#94a3b8" }}>
-                                {isPaid ? (payment?.amount_paid || plan.amount_due || 0).toLocaleString() : "—"} ج.م
-                              </td>
-                              <td>
-                                {isPaid ? (
-                                  <Badge bg="#dcfce7" text="#166534" border="#bbf7d0" icon={<CheckCircle2 size={12} />} label="مدفوع" />
-                                ) : (
-                                  <Badge bg="#fef3c7" text="#92400e" border="#fde68a" icon={<AlertCircle size={12} />} label="معلق" />
-                                )}
-                              </td>
-                              <td style={{ fontSize: "12px", color: "#64748b" }}>
-                                {payment ? new Date(payment.payment_date).toLocaleDateString("ar-EG") : "—"}
-                              </td>
-                            </tr>
-                          );
-                        })}
+                        {selectedInvoice.paymentHistory.map((p, idx) => (
+                          <tr key={p.id}>
+                            <td style={{ color: "#94a3b8" }}>{idx + 1}</td>
+                            <td>{new Date(p.payment_date).toLocaleDateString("ar-EG")}</td>
+                            <td style={{ color: "#34d399", fontWeight: "bold" }}>+{p.amount_paid.toLocaleString()} ج.م</td>
+                            <td style={{ fontSize: "12px", color: "#64748b" }}>{p.note || "تحصيل"}</td>
+                          </tr>
+                        ))}
                       </tbody>
                     </table>
                   </div>
