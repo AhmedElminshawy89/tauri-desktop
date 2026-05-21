@@ -102,8 +102,6 @@ const InstallmentInvoiceCard = ({ inv }) => {
       {/* ── التفاصيل (قابلة للطي) ── */}
       {open && (
         <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", padding: "16px 18px" }}>
-
-          {/* صف المقدم */}
           <div style={{ fontSize: "12px", color: "#64748b", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
             سجل الدفعات
           </div>
@@ -124,7 +122,6 @@ const InstallmentInvoiceCard = ({ inv }) => {
             </div>
           </div>
 
-          {/* دفعات ما بعد المقدم */}
           {inv.payments && inv.payments.length > 0 ? (
             inv.payments.map((p, i) => (
               <div key={p.id} style={{
@@ -152,7 +149,6 @@ const InstallmentInvoiceCard = ({ inv }) => {
             </div>
           )}
 
-          {/* ملخص */}
           <div style={{
             marginTop: "12px", padding: "12px 14px",
             background: "rgba(255,255,255,0.04)", borderRadius: "10px",
@@ -187,14 +183,12 @@ const CustomersPage = ({ showToast }) => {
   const [detailLoading, setDetailLoading] = useState(false);
   const [formData, setFormData]     = useState({ id: null, name: "", phone: "", address: "" });
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterType, setFilterType] = useState("all"); // all | installment | cash | debt
+  const [filterType, setFilterType] = useState("all");
 
-  // ── جلب العملاء ──────────────────────────────────
   const fetchCustomers = async () => {
     try {
       setLoading(true);
       const db = await getDb();
-
       const result = await db.select(`
         SELECT
           c.*,
@@ -209,7 +203,6 @@ const CustomersPage = ({ showToast }) => {
         GROUP BY c.id
         ORDER BY total_debt DESC, c.id DESC
       `);
-
       setCustomers(result);
     } catch (err) {
       console.error(err);
@@ -221,17 +214,13 @@ const CustomersPage = ({ showToast }) => {
 
   useEffect(() => { fetchCustomers(); }, []);
 
-  // ── فتح تفاصيل عميل ──────────────────────────────
   const openDetail = async (cus) => {
     setSelectedCustomer(cus);
     setModalType("detail");
     setDetailData(null);
     setDetailLoading(true);
-
     try {
       const db = await getDb();
-
-      // كل فواتير العميل
       const invoices = await db.select(`
         SELECT id, invoice_number, total_after_discount, paid_amount,
                remaining_amount, payment_method, created_at, status
@@ -241,22 +230,18 @@ const CustomersPage = ({ showToast }) => {
         ORDER BY created_at DESC
       `, [cus.id, cus.phone || ""]);
 
-      // لكل فاتورة تقسيط — جيب دفعاتها والمحصّل الكلي
       const enriched = await Promise.all(invoices.map(async (inv) => {
         if (inv.payment_method !== "installment") {
           return { ...inv, payments: [], down_payment: inv.paid_amount, total_paid_after: 0, payments_count: 0, current_remaining: Number(inv.remaining_amount) };
         }
-
         const payments = await db.select(`
           SELECT id, amount_paid, payment_date, payment_method, note
           FROM installment_payments
           WHERE invoice_id = $1
           ORDER BY payment_date ASC
         `, [inv.id]);
-
         const total_paid_after = payments.reduce((s, p) => s + Number(p.amount_paid), 0);
         const current_remaining = Number(inv.total_after_discount) - (Number(inv.paid_amount) + total_paid_after);
-
         return {
           ...inv,
           payments,
@@ -269,7 +254,6 @@ const CustomersPage = ({ showToast }) => {
 
       const installmentInvs = enriched.filter(i => i.payment_method === "installment");
       const cashInvs        = enriched.filter(i => i.payment_method !== "installment");
-
       const totalInstallmentDebt    = installmentInvs.reduce((s, i) => s + i.current_remaining, 0);
       const totalInstallmentCollected = installmentInvs.reduce((s, i) => s + i.down_payment + i.total_paid_after, 0);
       const totalInstallmentValue   = installmentInvs.reduce((s, i) => s + Number(i.total_after_discount), 0);
@@ -293,7 +277,6 @@ const CustomersPage = ({ showToast }) => {
     }
   };
 
-  // ── CRUD ──────────────────────────────────────────
   const handleSave = async (e) => {
     e.preventDefault();
     try {
@@ -337,7 +320,6 @@ const CustomersPage = ({ showToast }) => {
     setFormData({ id: null, name: "", phone: "", address: "" });
   };
 
-  // ── فلترة ────────────────────────────────────────
   const filtered = useMemo(() => {
     let list = customers.filter(c =>
       c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -356,92 +338,272 @@ const CustomersPage = ({ showToast }) => {
     cashOnlyCount:    customers.filter(c => c.installment_invoices === 0 && c.invoice_count > 0).length,
   }), [customers]);
 
-  // ── Render ────────────────────────────────────────
   return (
-    <div   className="page-container animate-fade-in" dir="rtl" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-
+    <div className="page-container animate-fade-in" dir="rtl">
+      <style>{`
+        /* ========== GLASS/CYBER THEME ========== */
+        .page-container {
+          padding: 24px;
+          background: transparent;
+          min-height: 100vh;
+          color: #e2e8f0;
+          font-family: system-ui, -apple-system, sans-serif;
+        }
+        .premium-stats-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+          gap: 20px;
+          margin-bottom: 32px;
+        }
+        .premium-stat-card {
+          position: relative;
+          background: rgba(15, 23, 42, 0.45);
+          backdrop-filter: blur(12px);
+          border: 1px solid rgba(255, 255, 255, 0.06);
+          border-radius: 16px;
+          padding: 20px;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .premium-stat-card:hover {
+          transform: translateY(-4px);
+          border-color: rgba(255, 255, 255, 0.15);
+          box-shadow: 0 12px 24px -10px rgba(0,0,0,0.6);
+        }
+        .stat-icon-wrapper {
+          width: 48px;
+          height: 48px;
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: rgba(255,255,255,0.03);
+          border: 1px solid rgba(255,255,255,0.08);
+        }
+        .stat-label { font-size: 13px; color: #94a3b8; }
+        .stat-value { font-size: 20px; font-weight: 700; color: #f8fafc; }
+        .page-header-container {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 24px;
+          padding: 20px 28px;
+          background: rgba(30, 41, 59, 0.3);
+          border-radius: 16px;
+          border: 1px solid rgba(255,255,255,0.05);
+          backdrop-filter: blur(8px);
+        }
+        .search-neon-wrapper { position: relative; }
+        .search-neon-input {
+          background: #0b0f19;
+          border: 1px solid #1e293b;
+          border-radius: 12px;
+          padding: 11px 42px 11px 16px;
+          width: 280px;
+          color: #f1f5f9;
+          font-size: 13.5px;
+          transition: all 0.25s ease;
+        }
+        .search-neon-input:focus {
+          border-color: #3b82f6;
+          box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+          outline: none;
+        }
+        .btn-action-neon {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 11px 20px;
+          border-radius: 12px;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          border: none;
+        }
+        .btn-add { background: #2563eb; color: #ffffff; }
+        .btn-add:hover { background: #1d4ed8; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(37,99,235,0.3); }
+        .btn-secondary {
+          background: #1e293b;
+          color: #94a3b8;
+          padding: 8px 16px;
+          border-radius: 10px;
+          border: none;
+          cursor: pointer;
+        }
+        .filter-tab {
+          padding: 7px 18px;
+          border-radius: 10px;
+          border: 1px solid;
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        .filter-tab-active {
+          border-color: #2d5f9e;
+          background: #1e3a5f;
+          color: #60a5fa;
+        }
+        .filter-tab-inactive {
+          border-color: rgba(255,255,255,0.08);
+          background: transparent;
+          color: #64748b;
+        }
+        .filter-tab-inactive:hover {
+          border-color: rgba(255,255,255,0.2);
+          color: #94a3b8;
+        }
+        .customer-card {
+          background: rgba(22,27,44,0.7);
+          border-radius: 18px;
+          padding: 18px 20px;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        .blur-overlay {
+          position: fixed;
+          top: 0; left: 0; right: 0; bottom: 0;
+          background: rgba(5, 8, 16, 0.75);
+          backdrop-filter: blur(8px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+          padding: 16px;
+        }
+        .cyber-modal {
+          background: #0f172a;
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 24px;
+          width: 100%;
+          max-width: 920px;
+          max-height: 90vh;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+        }
+        .modal-cyber-header {
+          padding: 18px 24px;
+          background: rgba(255,255,255,0.02);
+          border-bottom: 1px solid rgba(255,255,255,0.05);
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        .modal-close-btn {
+          background: none;
+          border: none;
+          color: #64748b;
+          cursor: pointer;
+          width: 36px;
+          height: 36px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .modal-close-btn:hover { background: rgba(255,255,255,0.05); color: white; }
+        .cyber-modal-body {
+          overflow-y: auto;
+          padding: 24px 28px;
+        }
+        .cyber-modal-footer {
+          padding: 16px 28px;
+          border-top: 1px solid rgba(255,255,255,0.06);
+          display: flex;
+          gap: 10px;
+        }
+        .animate-fade-in { animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .text-green-400 { color: #4ade80; }
+        .text-blue-400 { color: #60a5fa; }
+        .text-amber-400 { color: #fbbf24; }
+        .text-emerald-400 { color: #34d399; }
+        .text-gray-400 { color: #94a3b8; }
+      `}</style>
 
       {/* Header */}
       <div className="page-header-container">
-        <div className="page-header-container">
-          <h2 style={{ fontSize: "22px", fontWeight: "700", margin: 0 }}>دليل العملاء والمديونيات</h2>
-          <p style={{ color: "#64748b", fontSize: "13px", marginTop: "5px" }}>إدارة ملفات العملاء ومتابعة التحصيلات</p>
+        <div className="header-title-section">
+          <h2 className="main-title">دليل العملاء والمديونيات</h2>
+          <p className="sub-title">إدارة ملفات العملاء ومتابعة التحصيلات</p>
         </div>
-        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-          <div style={{ position: "relative" }}>
-            <Search size={15} style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", color: "#64748b" }} />
-            <input type="text" placeholder="بحث بالاسم أو الهاتف..." value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              style={{ background: "#161b2c", border: "1px solid #2d364f", borderRadius: "12px", color: "white", padding: "10px 36px 10px 14px", width: "280px", fontSize: "13px", outline: "none" }}
+        <div className="header-actions-group">
+          <div className="search-neon-wrapper">
+            <input
+              type="text"
+              placeholder="بحث بالاسم أو الهاتف..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="search-neon-input"
+              style={{ width: "280px" }}
             />
+            <Search size={15} className="search-icon" style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", color: "#64748b" }} />
           </div>
-          <button onClick={() => { setFormData({ id: null, name: "", phone: "", address: "" }); setModalType("add"); }}
-            style={{ display: "flex", alignItems: "center", gap: "8px", background: "#1e3a5f", border: "1px solid #2d5f9e", color: "#60a5fa", borderRadius: "12px", padding: "10px 18px", cursor: "pointer", fontSize: "13px", fontWeight: "600" }}
-          >
+          <button onClick={() => { setFormData({ id: null, name: "", phone: "", address: "" }); setModalType("add"); }} className="btn-action-neon btn-add">
             <UserPlus size={16} /> إضافة عميل
           </button>
         </div>
       </div>
 
-      {/* Stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "16px", marginBottom: "24px" }}>
-        {[
-          { label: "إجمالي المديونيات", value: fmt(stats.totalDebt), color: "#ef4444", icon: <Wallet size={16} /> },
-          { label: "إجمالي العملاء",    value: stats.count + " عميل",  color: "white",    icon: <UserPlus size={16} /> },
-          { label: "عملاء تقسيط",       value: stats.installmentCount + " عميل", color: "#f97316", icon: <CreditCard size={16} /> },
-          { label: "عملاء كاش فقط",     value: stats.cashOnlyCount + " عميل",   color: "#22c55e", icon: <Banknote size={16} /> },
-        ].map(s => (
-          <div key={s.label} style={{ background: "rgba(22,27,44,0.7)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "16px", padding: "18px 22px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "#64748b", fontSize: "12px", marginBottom: "8px" }}>
-              {s.icon} {s.label}
-            </div>
-            <div style={{ fontSize: "22px", fontWeight: "700", color: s.color }}>{s.value}</div>
-          </div>
-        ))}
+      {/* Stats Cards */}
+      <div className="premium-stats-grid">
+        <div className="premium-stat-card indigo">
+          <div className="stat-icon-wrapper"><Wallet size={24} /></div>
+          <div><div className="stat-label">إجمالي المديونيات</div><div className="stat-value" style={{ color: "#ef4444" }}>{fmt(stats.totalDebt)}</div></div>
+        </div>
+        <div className="premium-stat-card emerald">
+          <div className="stat-icon-wrapper"><UserPlus size={24} /></div>
+          <div><div className="stat-label">إجمالي العملاء</div><div className="stat-value">{stats.count} عميل</div></div>
+        </div>
+        <div className="premium-stat-card amber">
+          <div className="stat-icon-wrapper"><CreditCard size={24} /></div>
+          <div><div className="stat-label">عملاء تقسيط</div><div className="stat-value" style={{ color: "#f97316" }}>{stats.installmentCount} عميل</div></div>
+        </div>
+        <div className="premium-stat-card cyan">
+          <div className="stat-icon-wrapper"><Banknote size={24} /></div>
+          <div><div className="stat-label">عملاء كاش فقط</div><div className="stat-value" style={{ color: "#22c55e" }}>{stats.cashOnlyCount} عميل</div></div>
+        </div>
       </div>
 
       {/* Filter Tabs */}
-      <div style={{ display: "flex", gap: "8px", marginBottom: "20px" }}>
+      <div style={{ display: "flex", gap: "8px", marginBottom: "20px", flexWrap: "wrap" }}>
         {[
-          { key: "all",         label: "الكل" },
+          { key: "all", label: "الكل" },
           { key: "installment", label: "تقسيط" },
-          { key: "cash",        label: "كاش فقط" },
-          { key: "debt",        label: "عليهم ديون" },
+          { key: "cash", label: "كاش فقط" },
+          { key: "debt", label: "عليهم ديون" },
         ].map(f => (
-          <button key={f.key} onClick={() => setFilterType(f.key)}
-            style={{
-              padding: "7px 18px", borderRadius: "10px", border: "1px solid",
-              borderColor: filterType === f.key ? "#2d5f9e" : "rgba(255,255,255,0.08)",
-              background: filterType === f.key ? "#1e3a5f" : "transparent",
-              color: filterType === f.key ? "#60a5fa" : "#64748b",
-              cursor: "pointer", fontSize: "13px", fontWeight: "600"
-            }}
-          >{f.label}</button>
+          <button
+            key={f.key}
+            onClick={() => setFilterType(f.key)}
+            className={`filter-tab ${filterType === f.key ? "filter-tab-active" : "filter-tab-inactive"}`}
+          >
+            {f.label}
+          </button>
         ))}
       </div>
 
-      {/* Cards Grid */}
+      {/* Customers Grid */}
       {loading ? (
-        <div style={{ textAlign: "center", color: "#475569", padding: "60px 0" }}>جاري التحميل...</div>
+        <div className="cyber-table-container" style={{ textAlign: "center", padding: "60px" }}>جاري التحميل...</div>
       ) : filtered.length === 0 ? (
-        <div style={{ textAlign: "center", color: "#475569", padding: "60px 0", fontSize: "14px" }}>لا يوجد عملاء مطابقون</div>
+        <div className="cyber-table-container" style={{ textAlign: "center", padding: "60px", color: "#64748b" }}>لا يوجد عملاء مطابقون</div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "14px" }}>
           {filtered.map(cus => {
             const isInstallment = cus.installment_invoices > 0;
             const hasDebt       = Number(cus.total_debt) > 0.5;
+            const borderColor = hasDebt ? "rgba(249,115,22,0.25)" : isInstallment ? "rgba(96,165,250,0.2)" : "rgba(255,255,255,0.06)";
             return (
-              <div key={cus.id} style={{
-                background: "rgba(22,27,44,0.7)",
-                border: `1px solid ${hasDebt ? "rgba(249,115,22,0.25)" : isInstallment ? "rgba(96,165,250,0.2)" : "rgba(255,255,255,0.06)"}`,
-                borderRadius: "18px", padding: "18px 20px",
-                cursor: "pointer", transition: "all 0.2s"
-              }}
+              <div
+                key={cus.id}
+                className="customer-card"
+                style={{ border: `1px solid ${borderColor}` }}
                 onMouseEnter={e => e.currentTarget.style.borderColor = "rgba(255,255,255,0.18)"}
-                onMouseLeave={e => e.currentTarget.style.borderColor = hasDebt ? "rgba(249,115,22,0.25)" : isInstallment ? "rgba(96,165,250,0.2)" : "rgba(255,255,255,0.06)"}
+                onMouseLeave={e => e.currentTarget.style.borderColor = borderColor}
                 onClick={() => openDetail(cus)}
               >
-                {/* Card Header */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "14px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                     <div style={{
@@ -460,8 +622,6 @@ const CustomersPage = ({ showToast }) => {
                       </div>
                     </div>
                   </div>
-
-                  {/* نوع العميل Badge */}
                   <span style={{
                     fontSize: "11px", padding: "4px 10px", borderRadius: "20px", fontWeight: "700",
                     background: isInstallment ? "rgba(249,115,22,0.15)" : "rgba(34,197,94,0.12)",
@@ -471,7 +631,6 @@ const CustomersPage = ({ showToast }) => {
                   </span>
                 </div>
 
-                {/* Info Rows */}
                 {cus.address && (
                   <div style={{ fontSize: "12px", color: "#475569", marginBottom: "12px", display: "flex", alignItems: "center", gap: "5px" }}>
                     <MapPin size={11} /> {cus.address}
@@ -493,7 +652,6 @@ const CustomersPage = ({ showToast }) => {
                   </div>
                 </div>
 
-                {/* رسالة توضيحية */}
                 <div style={{
                   display: "flex", alignItems: "center", gap: "6px",
                   fontSize: "12px", color: "#64748b",
@@ -514,18 +672,11 @@ const CustomersPage = ({ showToast }) => {
         </div>
       )}
 
-      {/* ══════════════════════════════════════════════
-          Modal: تفاصيل العميل الكاملة
-      ══════════════════════════════════════════════ */}
+      {/* Modal: تفاصيل العميل */}
       {modalType === "detail" && selectedCustomer && (
-        <div onClick={closeModal} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999, padding: "20px" }}>
-          <div onClick={e => e.stopPropagation()} style={{
-            background: "#0f1424", border: "1px solid rgba(255,255,255,0.1)",
-            borderRadius: "24px", width: "920px", maxWidth: "100%",
-            maxHeight: "90vh", display: "flex", flexDirection: "column"
-          }}>
-            {/* Modal Header */}
-            <div style={{ padding: "20px 28px", borderBottom: "1px solid rgba(255,255,255,0.06)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div className="blur-overlay" onClick={closeModal}>
+          <div className="cyber-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-cyber-header">
               <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
                 <div style={{ width: "48px", height: "48px", borderRadius: "50%", background: "#1e3a5f", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", fontWeight: "700", color: "#60a5fa" }}>
                   {selectedCustomer.name[0]}
@@ -538,24 +689,20 @@ const CustomersPage = ({ showToast }) => {
                   </div>
                 </div>
               </div>
-              <button onClick={closeModal} style={{ background: "rgba(255,255,255,0.07)", border: "none", color: "#94a3b8", width: "36px", height: "36px", borderRadius: "50%", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <X size={18} />
-              </button>
+              <button className="modal-close-btn" onClick={closeModal}><X size={18} /></button>
             </div>
 
-            {/* Modal Body */}
-            <div style={{ overflowY: "auto", padding: "24px 28px" }}>
+            <div className="cyber-modal-body">
               {detailLoading ? (
-                <div style={{ textAlign: "center", color: "#475569", padding: "60px 0" }}>جاري جلب التفاصيل...</div>
+                <div style={{ textAlign: "center", color: "#64748b", padding: "60px 0" }}>جاري جلب التفاصيل...</div>
               ) : detailData && (
                 <>
-                  {/* ── ملخص سريع ── */}
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "12px", marginBottom: "28px" }}>
                     {[
-                      { label: "نوع العميل",       value: detailData.hasInstallments ? "تقسيط" : "كاش فقط", color: detailData.hasInstallments ? "#f97316" : "#22c55e" },
-                      { label: "فواتير التقسيط",   value: detailData.installmentInvs.length + " فاتورة",    color: "#60a5fa" },
-                      { label: "إجمالي الديون",    value: detailData.totalInstallmentDebt > 0.5 ? fmt(detailData.totalInstallmentDebt) : "لا يوجد", color: detailData.totalInstallmentDebt > 0.5 ? "#f97316" : "#22c55e" },
-                      { label: "إجمالي المحصّل",  value: fmt(detailData.totalInstallmentCollected + detailData.cashTotal), color: "#22c55e" },
+                      { label: "نوع العميل", value: detailData.hasInstallments ? "تقسيط" : "كاش فقط", color: detailData.hasInstallments ? "#f97316" : "#22c55e" },
+                      { label: "فواتير التقسيط", value: detailData.installmentInvs.length + " فاتورة", color: "#60a5fa" },
+                      { label: "إجمالي الديون", value: detailData.totalInstallmentDebt > 0.5 ? fmt(detailData.totalInstallmentDebt) : "لا يوجد", color: detailData.totalInstallmentDebt > 0.5 ? "#f97316" : "#22c55e" },
+                      { label: "إجمالي المحصّل", value: fmt(detailData.totalInstallmentCollected + detailData.cashTotal), color: "#22c55e" },
                     ].map(s => (
                       <div key={s.label} style={{ background: "rgba(255,255,255,0.04)", borderRadius: "14px", padding: "14px 16px" }}>
                         <div style={{ fontSize: "11px", color: "#64748b", marginBottom: "6px" }}>{s.label}</div>
@@ -564,7 +711,6 @@ const CustomersPage = ({ showToast }) => {
                     ))}
                   </div>
 
-                  {/* ── فواتير التقسيط ── */}
                   {detailData.hasInstallments ? (
                     <>
                       <div style={{ fontSize: "13px", fontWeight: "700", color: "#f97316", marginBottom: "14px", display: "flex", alignItems: "center", gap: "6px" }}>
@@ -590,7 +736,6 @@ const CustomersPage = ({ showToast }) => {
                     </div>
                   )}
 
-                  {/* ── فواتير الكاش ── */}
                   {detailData.cashInvs.length > 0 && (
                     <>
                       <div style={{ fontSize: "13px", fontWeight: "700", color: "#22c55e", margin: "20px 0 12px", display: "flex", alignItems: "center", gap: "6px" }}>
@@ -618,25 +763,20 @@ const CustomersPage = ({ showToast }) => {
                   )}
 
                   {detailData.invoices.length === 0 && (
-                    <div style={{ textAlign: "center", color: "#475569", padding: "40px 0", fontSize: "14px" }}>
-                      لا توجد فواتير مسجلة لهذا العميل
-                    </div>
+                    <div style={{ textAlign: "center", color: "#475569", padding: "40px 0", fontSize: "14px" }}>لا توجد فواتير مسجلة لهذا العميل</div>
                   )}
                 </>
               )}
             </div>
 
-            {/* Modal Footer */}
-            <div style={{ padding: "16px 28px", borderTop: "1px solid rgba(255,255,255,0.06)", display: "flex", gap: "10px" }}>
-              <button onClick={() => { closeModal(); setTimeout(() => { setFormData(selectedCustomer); setModalType("edit"); }, 100); }}
-                style={{ display: "flex", alignItems: "center", gap: "6px", padding: "10px 20px", background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.3)", color: "#fbbf24", borderRadius: "10px", cursor: "pointer", fontSize: "13px" }}>
+            <div className="cyber-modal-footer">
+              <button onClick={() => { closeModal(); setTimeout(() => { setFormData(selectedCustomer); setModalType("edit"); }, 100); }} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "10px 20px", background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.3)", color: "#fbbf24", borderRadius: "10px", cursor: "pointer" }}>
                 <Edit size={14} /> تعديل البيانات
               </button>
-              <button onClick={() => { setFormData(selectedCustomer); closeModal(); setTimeout(() => setModalType("delete"), 100); }}
-                style={{ display: "flex", alignItems: "center", gap: "6px", padding: "10px 20px", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", color: "#f87171", borderRadius: "10px", cursor: "pointer", fontSize: "13px" }}>
+              <button onClick={() => { setFormData(selectedCustomer); closeModal(); setTimeout(() => setModalType("delete"), 100); }} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "10px 20px", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", color: "#f87171", borderRadius: "10px", cursor: "pointer" }}>
                 <Trash2 size={14} /> حذف العميل
               </button>
-              <button onClick={closeModal} style={{ marginRight: "auto", padding: "10px 20px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "#94a3b8", borderRadius: "10px", cursor: "pointer", fontSize: "13px" }}>
+              <button onClick={closeModal} style={{ marginRight: "auto", padding: "10px 20px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "#94a3b8", borderRadius: "10px", cursor: "pointer" }}>
                 إغلاق
               </button>
             </div>
@@ -646,29 +786,31 @@ const CustomersPage = ({ showToast }) => {
 
       {/* Modal: إضافة / تعديل */}
       {(modalType === "add" || modalType === "edit") && (
-        <div onClick={closeModal} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999 }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: "#0f1424", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "20px", padding: "28px", width: "420px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "20px" }}>
-              <h3 style={{ fontSize: "16px", fontWeight: "700" }}>{modalType === "add" ? "إضافة عميل جديد" : "تعديل بيانات العميل"}</h3>
-              <button onClick={closeModal} style={{ background: "none", border: "none", color: "#64748b", cursor: "pointer" }}><X size={18} /></button>
+        <div className="blur-overlay" onClick={closeModal}>
+          <div className="cyber-modal" style={{ maxWidth: "420px" }} onClick={e => e.stopPropagation()}>
+            <div className="modal-cyber-header">
+              <h3>{modalType === "add" ? "إضافة عميل جديد" : "تعديل بيانات العميل"}</h3>
+              <button className="modal-close-btn" onClick={closeModal}><X size={18} /></button>
             </div>
             <form onSubmit={handleSave}>
-              {[
-                { label: "الاسم الكامل", field: "name", type: "text", ph: "أحمد محمد علي", req: true },
-                { label: "رقم الهاتف",   field: "phone", type: "text", ph: "01xxxxxxxxx" },
-                { label: "العنوان",       field: "address", type: "text", ph: "المدينة، الشارع..." },
-              ].map(f => (
-                <div key={f.field} style={{ marginBottom: "14px" }}>
-                  <label style={{ fontSize: "12px", color: "#94a3b8", display: "block", marginBottom: "6px" }}>{f.label}</label>
-                  <input type={f.type} required={f.req} value={formData[f.field] || ""} placeholder={f.ph}
-                    onChange={e => setFormData(p => ({ ...p, [f.field]: e.target.value }))}
-                    style={{ width: "100%", background: "#080a10", border: "1px solid #2d364f", color: "white", borderRadius: "10px", padding: "11px 14px", fontSize: "14px", outline: "none" }}
-                  />
-                </div>
-              ))}
-              <button type="submit" style={{ width: "100%", padding: "13px", background: "#1e3a5f", border: "1px solid #2d5f9e", color: "#60a5fa", borderRadius: "12px", fontSize: "14px", fontWeight: "700", cursor: "pointer", marginTop: "8px" }}>
-                {modalType === "add" ? "حفظ العميل" : "تحديث البيانات"}
-              </button>
+              <div className="cyber-modal-body" style={{ padding: "24px" }}>
+                {[
+                  { label: "الاسم الكامل", field: "name", type: "text", ph: "أحمد محمد علي", req: true },
+                  { label: "رقم الهاتف", field: "phone", type: "text", ph: "01xxxxxxxxx" },
+                  { label: "العنوان", field: "address", type: "text", ph: "المدينة، الشارع..." },
+                ].map(f => (
+                  <div key={f.field} className="cyber-input-group" style={{ marginBottom: "14px" }}>
+                    <label>{f.label}</label>
+                    <input type={f.type} required={f.req} value={formData[f.field] || ""} placeholder={f.ph}
+                      onChange={e => setFormData(p => ({ ...p, [f.field]: e.target.value }))}
+                    />
+                  </div>
+                ))}
+              </div>
+              <div className="cyber-modal-footer" style={{ justifyContent: "flex-end" }}>
+                <button type="submit" className="cyber-btn-submit">{modalType === "add" ? "حفظ العميل" : "تحديث البيانات"}</button>
+                <button type="button" className="cyber-btn-dismiss" onClick={closeModal}>إلغاء</button>
+              </div>
             </form>
           </div>
         </div>
@@ -676,20 +818,22 @@ const CustomersPage = ({ showToast }) => {
 
       {/* Modal: حذف */}
       {modalType === "delete" && (
-        <div onClick={closeModal} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999 }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: "#0f1424", border: "1px solid rgba(239,68,68,0.3)", borderRadius: "20px", padding: "32px 28px", width: "380px", textAlign: "center" }}>
-            <Trash2 size={40} style={{ color: "#f87171", marginBottom: "14px" }} />
-            <h3 style={{ fontSize: "16px", fontWeight: "700", marginBottom: "8px" }}>حذف العميل "{formData.name}"؟</h3>
-            <p style={{ fontSize: "13px", color: "#64748b", lineHeight: "1.6", marginBottom: "24px" }}>
-              سيتم حذف بيانات العميل نهائياً. لا يمكن حذف عميل مرتبط بفواتير.
-            </p>
-            <div style={{ display: "flex", gap: "10px" }}>
-              <button onClick={handleDelete} style={{ flex: 1, padding: "12px", background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.4)", color: "#f87171", borderRadius: "12px", cursor: "pointer", fontSize: "14px", fontWeight: "700" }}>
-                تأكيد الحذف
-              </button>
-              <button onClick={closeModal} style={{ flex: 1, padding: "12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "#94a3b8", borderRadius: "12px", cursor: "pointer", fontSize: "14px" }}>
-                تراجع
-              </button>
+        <div className="blur-overlay" onClick={closeModal}>
+          <div className="cyber-modal" style={{ maxWidth: "380px", textAlign: "center" }} onClick={e => e.stopPropagation()}>
+            <div className="modal-cyber-header">
+              <h3 style={{ color: "#f87171" }}>حذف العميل</h3>
+              <button className="modal-close-btn" onClick={closeModal}><X size={18} /></button>
+            </div>
+            <div className="cyber-modal-body" style={{ textAlign: "center" }}>
+              <Trash2 size={40} style={{ color: "#f87171", marginBottom: "14px" }} />
+              <h3 style={{ fontSize: "16px", fontWeight: "700", marginBottom: "8px" }}>حذف العميل "{formData.name}"؟</h3>
+              <p style={{ fontSize: "13px", color: "#64748b", lineHeight: "1.6", marginBottom: "24px" }}>
+                سيتم حذف بيانات العميل نهائياً. لا يمكن حذف عميل مرتبط بفواتير.
+              </p>
+              <div className="cyber-modal-actions" style={{ display: "flex", gap: "10px" }}>
+                <button onClick={handleDelete} className="cyber-btn-submit danger-bg" style={{ background: "#ef4444" }}>تأكيد الحذف</button>
+                <button onClick={closeModal} className="cyber-btn-dismiss">تراجع</button>
+              </div>
             </div>
           </div>
         </div>

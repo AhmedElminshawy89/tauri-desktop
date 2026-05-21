@@ -24,11 +24,7 @@ const PERMISSION_SECTIONS = [
     perms: [
       { key: "cashier", label: "نقطة البيع", desc: "إتمام فواتير جديدة" },
       { key: "edit_bill", label: "تعديل الفواتير", desc: "تغيير فواتير سابقة" },
-      {
-        key: "delete_bill",
-        label: "حذف الفواتير",
-        desc: "حذف نهائي لا يُسترد",
-      },
+      { key: "delete_bill", label: "حذف الفواتير", desc: "حذف نهائي لا يُسترد" },
       { key: "returns", label: "المرتجعات", desc: "استرجاع البضاعة" },
       { key: "on_hold", label: "فواتير معلقة", desc: "حفظ واسترداد الفواتير" },
     ],
@@ -48,18 +44,10 @@ const PERMISSION_SECTIONS = [
     label: "المالية والتقارير",
     perms: [
       { key: "safe", label: "حركة الخزينة", desc: "الإيرادات والمصروفات" },
-      {
-        key: "installments",
-        label: "تحصيل الأقساط",
-        desc: "المديونيات والأقساط",
-      },
+      { key: "installments", label: "تحصيل الأقساط", desc: "المديونيات والأقساط" },
       { key: "expenses", label: "المصروفات", desc: "تسجيل المصاريف" },
       { key: "reports", label: "التقارير", desc: "الأرباح والإحصاءات" },
-      {
-        key: "accounts",
-        label: "إدارة الحسابات",
-        desc: "المستخدمون والصلاحيات",
-      },
+      { key: "accounts", label: "إدارة الحسابات", desc: "المستخدمون والصلاحيات" },
     ],
   },
 ];
@@ -128,8 +116,7 @@ const AccountsPage = ({ showToast, currentUser }) => {
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showPassModal, setShowPassModal] = useState(false);
-  const [showUpdateModal, setShowUpdateModal] = useState(false);
-const [editingUser, setEditingUser] = useState(null); // Stores the user data being edited
+  const [editingUser, setEditingUser] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [newUser, setNewUser] = useState({
@@ -180,58 +167,39 @@ const [editingUser, setEditingUser] = useState(null); // Stores the user data be
     setDirty(false);
   };
 
-  const openUpdateModal = (user) => {
-  setEditingUser({
-    id: user.id,
-    username: user.username,
-    password: "", 
-    role: user.role
-  });
-  setShowUpdateModal(true);
-};
-// عند فتح المودال للتعديل
-const openEditModal = (user) => {
-  setEditingUser(user); // نضع بيانات المستخدم هنا
-  setNewUser({ username: user.username, password: "", role: user.role }); // كلمة المرور فارغة اختيارياً
-  setShowAddModal(true);
-};
+  const openEditModal = (user) => {
+    setEditingUser(user);
+    setNewUser({ username: user.username, password: "", role: user.role });
+    setShowAddModal(true);
+  };
 
-// عند فتح المودال للإضافة
-const openAddModal = () => {
-  setEditingUser(null); 
-  setNewUser({ username: "", password: "", role: "User" });
-  setShowAddModal(true);
-};
-
-const updateUser = async () => {
-  // التحقق من وجود اسم مستخدم قبل الإرسال
-  if (!newUser.username.trim()) {
-    return showToast("اسم المستخدم مطلوب", "warning");
-  }
-
-  try {
-    const db = await getDb();
-    
-    // تحديث اليوزر باسمه ورتبته فقط
-    await db.execute(
-      "UPDATE users SET username = $1, role = $2 WHERE id = $3",
-      [newUser.username.trim(), newUser.role, editingUser.id]
-    );
-
-    showToast("تم تحديث البيانات بنجاح", "success");
-    
-    // إغلاق المودال وتصفير الحالة
-    setShowAddModal(false);
+  const openAddModal = () => {
     setEditingUser(null);
     setNewUser({ username: "", password: "", role: "User" });
-    
-    // تحديث الجدول
-    await fetchUsers();
-  } catch (err) {
-    console.error("Update Error:", err);
-    showToast("فشل التحديث — الاسم قد يكون مستخدماً بالفعل", "error");
-  }
-};
+    setShowAddModal(true);
+  };
+
+  const updateUser = async () => {
+    if (!newUser.username.trim()) {
+      return showToast("اسم المستخدم مطلوب", "warning");
+    }
+    try {
+      const db = await getDb();
+      await db.execute("UPDATE users SET username = $1, role = $2 WHERE id = $3", [
+        newUser.username.trim(),
+        newUser.role,
+        editingUser.id,
+      ]);
+      showToast("تم تحديث البيانات بنجاح", "success");
+      setShowAddModal(false);
+      setEditingUser(null);
+      setNewUser({ username: "", password: "", role: "User" });
+      await fetchUsers();
+    } catch (err) {
+      console.error("Update Error:", err);
+      showToast("فشل التحديث — الاسم قد يكون مستخدماً بالفعل", "error");
+    }
+  };
 
   const togglePerm = (key, val) => {
     setDraftPerms((prev) => ({ ...prev, [key]: val ? 1 : 0 }));
@@ -292,7 +260,6 @@ const updateUser = async () => {
         "INSERT INTO users (username, password, role) VALUES ($1, $2, $3)",
         [newUser.username.trim(), newUser.password, newUser.role]
       );
-      // إنشاء سجل صلاحيات افتراضي
       const uid = res.lastInsertId;
       const cols = Object.keys(DEFAULT_PERMS);
       const vals = cols.map((c) => DEFAULT_PERMS[c]);
@@ -314,10 +281,9 @@ const updateUser = async () => {
       return showToast("كلمة المرور الجديدة فارغة", "warning");
     try {
       const db = await getDb();
-      const check = await db.select(
-        "SELECT password FROM users WHERE id = $1",
-        [passForm.id]
-      );
+      const check = await db.select("SELECT password FROM users WHERE id = $1", [
+        passForm.id,
+      ]);
       if (check[0]?.password !== passForm.oldPass)
         return showToast("كلمة المرور الحالية غلط", "error");
       await db.execute("UPDATE users SET password = $1 WHERE id = $2", [
@@ -351,6 +317,367 @@ const updateUser = async () => {
 
   return (
     <div className="page-container animate-fade-in" dir="rtl">
+      <style>{`
+        /* Core Variable & Layout Overrides */
+        .page-container {
+          padding: 24px;
+          background: transparent;
+          min-height: 100vh;
+          color: #e2e8f0;
+          font-family: system-ui, -apple-system, sans-serif;
+        }
+
+        /* 1. Premium Stats Cards Styles */
+        .premium-stats-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+          gap: 20px;
+          margin-bottom: 32px;
+        }
+        .premium-stat-card {
+          position: relative;
+          background: rgba(15, 23, 42, 0.45);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          border: 1px solid rgba(255, 255, 255, 0.06);
+          border-radius: 16px;
+          padding: 20px;
+          overflow: hidden;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .premium-stat-card:hover {
+          transform: translateY(-4px);
+          border-color: rgba(255, 255, 255, 0.15);
+          box-shadow: 0 12px 24px -10px rgba(0,0,0,0.6);
+        }
+        .stat-glow {
+          position: absolute;
+          width: 80px;
+          height: 80px;
+          border-radius: 50%;
+          top: -20px;
+          right: -20px;
+          filter: blur(40px);
+          opacity: 0.15;
+          transition: opacity 0.3s ease;
+        }
+        .premium-stat-card:hover .stat-glow { opacity: 0.3; }
+        .card-blue .stat-glow { background: #3b82f6; }
+        .card-emerald .stat-glow { background: #10b981; }
+        .card-cyan .stat-glow { background: #06b6d4; }
+        .card-amber .stat-glow { background: #f59e0b; }
+        
+        .stat-content { display: flex; align-items: center; gap: 16px; position: relative; z-index: 1; }
+        .icon-box {
+          width: 48px;
+          height: 48px;
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: rgba(255,255,255,0.03);
+          border: 1px solid rgba(255,255,255,0.08);
+        }
+        .card-blue .icon-box { color: #60a5fa; background: rgba(59,130,246,0.1); }
+        .card-emerald .icon-box { color: #34d399; background: rgba(16,185,129,0.1); }
+        .card-cyan .icon-box { color: #22d3ee; background: rgba(6,182,212,0.1); }
+        .card-amber .icon-box { color: #fbbf24; background: rgba(245,158,11,0.1); }
+        
+        .stat-details { display: flex; flex-direction: column; gap: 4px; }
+        .stat-details .label { font-size: 13px; color: #94a3b8; }
+        .stat-details .value { font-size: 20px; font-weight: 700; color: #f8fafc; }
+        .price-text { font-family: monospace, sans-serif; letter-spacing: -0.5px; }
+        .warning-glow { color: #ff9800 !important; text-shadow: 0 0 10px rgba(245,158,11,0.2); }
+
+        /* 2. Modern Blurred Header Control Bar */
+        .premium-control-bar {
+          background: rgba(15, 23, 42, 0.4);
+          backdrop-filter: blur(10px);
+          border: 1px solid rgba(255, 255, 255, 0.05);
+          border-radius: 16px;
+          padding: 18px 24px;
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: space-between;
+          align-items: center;
+          gap: 20px;
+          margin-bottom: 24px;
+        }
+        .title-wrapper { display: flex; align-items: center; gap: 16px; }
+        .brand-badge {
+          width: 50px;
+          height: 50px;
+          border-radius: 14px;
+          background: linear-gradient(135deg, #1e293b, #0f172a);
+          border: 1px solid #334155;
+          color: #60a5fa;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: inset 0 2px 4px rgba(255,255,255,0.05);
+        }
+        .main-title-neon { font-size: 20px; font-weight: 700; color: #ffffff; letter-spacing: -0.3px; margin: 0; }
+        .sub-title-dim { font-size: 13px; color: #64748b; margin: 4px 0 0 0; }
+        
+        .actions-wrapper { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+        .search-neon-wrapper { position: relative; }
+        .search-icon { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: #475569; }
+        .search-neon-input {
+          background: #0b0f19;
+          border: 1px solid #1e293b;
+          border-radius: 12px;
+          padding: 11px 42px 11px 16px;
+          width: 280px;
+          color: #f1f5f9;
+          font-size: 13.5px;
+          transition: all 0.25s ease;
+        }
+        .search-neon-input:focus {
+          border-color: #3b82f6;
+          box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+          outline: none;
+        }
+        .btn-action-neon {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 11px 20px;
+          border-radius: 12px;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          border: none;
+        }
+        .btn-add { background: #2563eb; color: #ffffff; }
+        .btn-add:hover { background: #1d4ed8; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(37,99,235,0.3); }
+
+        /* 3. Cyber Punk Table Infrastructure */
+        .cyber-table-container {
+          background: rgba(15, 23, 42, 0.3);
+          border: 1px solid rgba(255, 255, 255, 0.05);
+          border-radius: 16px;
+          overflow: hidden;
+          box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        }
+        .cyber-table { width: 100%; border-collapse: collapse; text-align: right; }
+        .cyber-table th {
+          background: rgba(15, 23, 42, 0.8);
+          padding: 16px;
+          font-size: 13px;
+          font-weight: 600;
+          color: #94a3b8;
+          border-bottom: 1px solid #1e293b;
+        }
+        .table-th-icon { display: inline; vertical-align: middle; margin-left: 6px; color: #475569; }
+        .cyber-row-main {
+          border-bottom: 1px solid rgba(30, 41, 59, 0.5);
+          transition: background 0.2s ease;
+        }
+        .cyber-row-main:hover { background: rgba(30, 41, 59, 0.3); }
+        .row-active { background: rgba(59, 130, 246, 0.04) !important; }
+        .cyber-row-main td { padding: 14px 16px; font-size: 14px; vertical-align: middle; }
+        
+        .expand-trigger { text-align: center; cursor: pointer; }
+        .chevron-circle {
+          width: 28px;
+          height: 28px;
+          border-radius: 50%;
+          background: rgba(255,255,255,0.02);
+          border: 1px solid rgba(255,255,255,0.05);
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          color: #64748b;
+          transition: all 0.25s ease;
+        }
+        .cyber-row-main:hover .chevron-circle { border-color: #475569; color: #94a3b8; }
+        .chevron-circle.rotated { transform: rotate(-90deg); background: rgba(59,130,246,0.15); border-color: rgba(59,130,246,0.3); color: #60a5fa; }
+        
+        .supplier-identity { display: flex; align-items: center; gap: 12px; }
+        .sup-avatar {
+          width: 32px;
+          height: 32px;
+          border-radius: 8px;
+          background: #1e293b;
+          color: #94a3b8;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: 700;
+          font-size: 13px;
+          border: 1px solid #334155;
+        }
+        .sup-name { font-weight: 600; color: #f1f5f9; }
+        .phone-badge {
+          background: rgba(16, 185, 129, 0.08);
+          border: 1px solid rgba(16, 185, 129, 0.15);
+          color: #34d399;
+          padding: 4px 10px;
+          border-radius: 8px;
+          font-size: 13px;
+          font-family: monospace;
+        }
+        .dim-dash { color: #334155; }
+        
+        /* Financial columns font styling */
+        .num-primary { font-family: monospace; font-weight: 600; color: #cbd5e1; }
+        .num-success { font-family: monospace; font-weight: 600; color: #34d399; }
+        .num-accent { font-family: monospace; font-weight: 600; color: #94a3b8; }
+        .num-accent.has-debt { color: #f97316; text-shadow: 0 0 10px rgba(249,115,22,0.1); }
+        
+        .table-actions-cell { display: flex; gap: 8px; justify-content: center; }
+        .cyber-btn-mini {
+          width: 32px;
+          height: 32px;
+          border-radius: 8px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          border: none;
+          transition: all 0.2s ease;
+          background: rgba(255,255,255,0.02);
+          border: 1px solid rgba(255,255,255,0.05);
+        }
+        .cyber-btn-mini.edit { color: #60a5fa; }
+        .cyber-btn-mini.edit:hover { background: rgba(59,130,246,0.12); border-color: rgba(59,130,246,0.3); }
+        .cyber-btn-mini.delete { color: #f87171; }
+        .cyber-btn-mini.delete:hover { background: rgba(248,113,113,0.12); border-color: rgba(248,113,113,0.3); }
+        
+        /* 4. Sub-tables Panel Designs */
+        .cyber-nested-row { background: #0b0f17; }
+        .nested-wrapper { padding: 20px; border-left: 3px solid #2563eb; background: linear-gradient(180deg, rgba(15,23,42,0.4) 0%, rgba(11,15,23,0) 100%); }
+        .nested-header { margin-bottom: 14px; }
+        .nested-title { display: flex; align-items: center; gap: 8px; }
+        .nested-title h4 { margin: 0; font-size: 14px; font-weight: 600; color: #e2e8f0; }
+        
+        .nested-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+        .nested-table th { background: #111827; padding: 10px 14px; color: #64748b; border-bottom: 1px solid #1f2937; text-align: right; }
+        .nested-body-row { border-bottom: 1px solid rgba(255,255,255,0.02); }
+        .nested-body-row:hover { background: rgba(255,255,255,0.01); }
+        .nested-body-row td { padding: 12px 14px; font-size: 13.5px; color: #cbd5e1; }
+        
+        .num-bold { font-family: monospace; font-weight: 700; color: #ffffff; }
+        .num-success-dim { font-family: monospace; color: #10b981; }
+        .num-warning-dim { font-family: monospace; color: #f59e0b; font-weight: 600; }
+        
+        .nested-actions { display: flex; gap: 6px; }
+        .btn-nested-action {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 12px;
+          border-radius: 6px;
+          font-size: 12px;
+          cursor: pointer;
+          border: none;
+          background: #1e293b;
+          color: #94a3b8;
+          transition: all 0.2s ease;
+        }
+        .btn-nested-action.view:hover { background: #2563eb; color: white; }
+        .btn-nested-action.delete { padding: 6px 8px; color: #f87171; }
+        .btn-nested-action.delete:hover { background: rgba(239,68,68,0.2); }
+
+        /* 5. Modals & Overlays Glassmorphism Struct */
+        .blur-overlay {
+          position: fixed;
+          top: 0; left: 0; right: 0; bottom: 0;
+          background: rgba(5, 8, 16, 0.75);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 999;
+          padding: 16px;
+        }
+        .cyber-modal {
+          background: #0f172a;
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 20px;
+          width: 100%;
+          max-width: 480px;
+          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+          overflow: hidden;
+        }
+        .wide-modal { max-width: 780px; }
+        .modal-cyber-header {
+          padding: 18px 24px;
+          background: rgba(255,255,255,0.02);
+          border-bottom: 1px solid rgba(255,255,255,0.05);
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        .modal-cyber-header h3 { margin: 0; font-size: 16px; font-weight: 700; color: white; }
+        .modal-close-btn { background: none; border: none; color: #64748b; cursor: pointer; }
+        .modal-close-btn:hover { color: white; }
+        
+        .cyber-form { padding: 24px; display: flex; flex-direction: column; gap: 18px; }
+        .cyber-input-group { display: flex; flex-direction: column; gap: 8px; }
+        .cyber-input-group label { font-size: 13px; color: #94a3b8; display: inline-flex; align-items: center; gap: 6px; }
+        .cyber-input-group input {
+          background: #070a12;
+          border: 1px solid #1e293b;
+          border-radius: 10px;
+          padding: 12px;
+          color: white;
+          font-size: 14px;
+          transition: border 0.2s ease;
+        }
+        .cyber-input-group input:focus { border-color: #2563eb; outline: none; }
+        
+        .cyber-modal-actions { display: flex; gap: 12px; margin-top: 8px; }
+        .cyber-modal-actions.centered { justify-content: center; }
+        .cyber-modal-actions.end-aligned { justify-content: flex-end; padding: 16px 24px; background: rgba(0,0,0,0.15); }
+        .cyber-btn-submit {
+          flex: 1; padding: 12px; border-radius: 10px; background: #2563eb; color: white; font-weight: 600; font-size: 14px; border: none; cursor: pointer; transition: background 0.2s;
+        }
+        .cyber-btn-submit:hover { background: #1d4ed8; }
+        .cyber-btn-submit.danger-bg { background: #ef4444; }
+        .cyber-btn-submit.danger-bg:hover { background: #dc2626; }
+        .cyber-btn-dismiss {
+          padding: 12px 20px; border-radius: 10px; background: #1e293b; color: #94a3b8; font-weight: 600; font-size: 14px; border: none; cursor: pointer;
+        }
+        .cyber-btn-dismiss:hover { background: #334155; color: white; }
+        
+        /* System Alerts Config */
+        .dialog-alert { max-width: 400px; padding: 24px; text-align: center; }
+        .alert-head-icon { width: 64px; height: 64px; border-radius: 50%; background: rgba(245,158,11,0.1); color: #f59e0b; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px; }
+        .alert-desc { font-size: 14px; color: #94a3b8; line-height: 1.6; margin: 12px 0 24px; }
+        
+        /* Full Specs View Config */
+        .modal-scroll-area { padding: 24px; max-height: 60vh; overflow-y: auto; }
+        .spec-invoice-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 24px; }
+        .spec-card { background: #111827; border: 1px solid #1f2937; padding: 12px; border-radius: 10px; display: flex; flex-direction: column; gap: 4px; }
+        .spec-card span { font-size: 11.5px; color: #64748b; }
+        .spec-card strong { font-size: 14px; font-family: system-ui; }
+        
+        .spec-section-box { margin-top: 24px; background: rgba(0,0,0,0.1); border: 1px solid rgba(255,255,255,0.02); border-radius: 12px; padding: 16px; }
+        .spec-box-title { font-size: 13.5px; font-weight: 600; color: #94a3b8; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+        .spec-table { width: 100%; border-collapse: collapse; text-align: right; }
+        .spec-table th { font-size: 12px; color: #475569; padding: 8px 12px; border-bottom: 1px solid #1f2937; }
+        .spec-table td { padding: 12px; font-size: 13px; border-bottom: 1px solid rgba(255,255,255,0.02); color: #cbd5e1; }
+        
+        .variant-tag { background: #1e293b; padding: 2px 8px; border-radius: 4px; font-size: 11.5px; color: #94a3b8; }
+        .payment-method-tag { background: rgba(59,130,246,0.1); color: #60a5fa; padding: 2px 8px; border-radius: 4px; font-size: 11.5px; }
+        
+        /* Loading Utilities */
+        .cyber-loading-card { text-align: center; color: #94a3b8; font-size: 14px; }
+        .cyber-table-loading, .cyber-table-empty, .nested-loading, .nested-empty, .spec-empty {
+          text-align: center; padding: 40px !important; color: #64748b; font-size: 13.5px;
+        }
+        .nested-loading, .nested-empty, .spec-empty { padding: 24px !important; }
+        
+        /* Animation Utility Drivers */
+        .animate-scale-up { animation: scaleUp 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+        .animate-slide-down { animation: slideDown 0.25s ease-out forwards; }
+        @keyframes scaleUp { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @keyframes slideDown { from { transform: translateY(-10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+      `}</style>
+
       <div className="page-header-container">
         <div className="header-title-section">
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -360,16 +687,12 @@ const updateUser = async () => {
           <p className="sub-title">تحكم دقيق في ما يراه ويفعله كل مستخدم</p>
         </div>
         <div className="header-actions-group">
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="btn-save"
-          >
+          <button onClick={openAddModal} className="btn-save">
             <Plus size={16} /> إضافة مستخدم
           </button>
         </div>
       </div>
 
-      {/* Layout */}
       <div
         style={{
           display: "grid",
@@ -378,7 +701,7 @@ const updateUser = async () => {
           alignItems: "start",
         }}
       >
-        {/* ── User List ── */}
+        {/* User List */}
         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
           <div
             style={{
@@ -392,9 +715,7 @@ const updateUser = async () => {
             المستخدمون ({users.length})
           </div>
           {loading ? (
-            <div
-              style={{ color: "#475569", fontSize: "13px", padding: "20px 0" }}
-            >
+            <div style={{ color: "#475569", fontSize: "13px", padding: "20px 0" }}>
               جاري التحميل...
             </div>
           ) : (
@@ -484,45 +805,33 @@ const updateUser = async () => {
                   >
                     <Lock size={13} />
                   </button>
-<button
-  title="تعديل بيانات الحساب"
-  onClick={() => {
-    // 1. تحديد المستخدم الذي يتم تعديله
-    setEditingUser(u); 
-    // 2. تعبئة الحقول بالبيانات الحالية (مع ترك كلمة المرور فارغة)
-    setNewUser({ 
-      username: u.username, 
-      password: "", 
-      role: u.role 
-    });
-    // 3. فتح المودال المشترك
-    setShowAddModal(true);
-  }}
-  style={{
-    background: "#1e3a5f",
-    border: "1px solid rgba(59, 130, 246, 0.2)", // إضافة إطار خفيف ليعطي مظهر احترافي
-    color: "#60a5fa", // تغيير اللون للأزرق ليتناسب مع أيقونة التعديل
-    width: "28px",
-    height: "28px",
-    borderRadius: "8px",
-    cursor: "pointer",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    transition: "all 0.2s ease", // إضافة أنيميشن بسيط عند الهوفر
-  }}
-  // إضافة تأثير عند مرور الماوس
-  onMouseEnter={(e) => {
-    e.currentTarget.style.background = "#2563eb";
-    e.currentTarget.style.color = "white";
-  }}
-  onMouseLeave={(e) => {
-    e.currentTarget.style.background = "#1e3a5f";
-    e.currentTarget.style.color = "#60a5fa";
-  }}
->
-  <Edit size={14} />
-</button>
+                  <button
+                    title="تعديل بيانات الحساب"
+                    onClick={() => openEditModal(u)}
+                    style={{
+                      background: "#1e3a5f",
+                      border: "1px solid rgba(59, 130, 246, 0.2)",
+                      color: "#60a5fa",
+                      width: "28px",
+                      height: "28px",
+                      borderRadius: "8px",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      transition: "all 0.2s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "#2563eb";
+                      e.currentTarget.style.color = "white";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "#1e3a5f";
+                      e.currentTarget.style.color = "#60a5fa";
+                    }}
+                  >
+                    <Edit size={14} />
+                  </button>
                   <button
                     title="حذف الحساب"
                     onClick={() => {
@@ -550,6 +859,7 @@ const updateUser = async () => {
           )}
         </div>
 
+        {/* Permissions Panel */}
         <div
           style={{
             background: "rgba(22,27,44,0.7)",
@@ -588,9 +898,7 @@ const updateUser = async () => {
                   borderBottom: "1px solid rgba(255,255,255,0.06)",
                 }}
               >
-                <div
-                  style={{ display: "flex", alignItems: "center", gap: "12px" }}
-                >
+                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                   <div
                     style={{
                       width: "44px",
@@ -611,13 +919,7 @@ const updateUser = async () => {
                     <div style={{ fontSize: "16px", fontWeight: "700" }}>
                       {selectedUser.username}
                     </div>
-                    <div
-                      style={{
-                        fontSize: "12px",
-                        color: "#64748b",
-                        marginTop: "2px",
-                      }}
-                    >
+                    <div style={{ fontSize: "12px", color: "#64748b", marginTop: "2px" }}>
                       {isAdmin ? (
                         <span style={{ color: "#a78bfa" }}>
                           مدير النظام — صلاحيات كاملة تلقائياً
@@ -762,15 +1064,11 @@ const updateUser = async () => {
                       transition: "all 0.2s",
                     }}
                   >
-                    <Save size={16} />{" "}
-                    {saving ? "جاري الحفظ..." : "حفظ الصلاحيات"}
+                    <Save size={16} /> {saving ? "جاري الحفظ..." : "حفظ الصلاحيات"}
                   </button>
                   <button
                     onClick={() => {
-                      setDraftPerms({
-                        ...DEFAULT_PERMS,
-                        ...selectedUser.perms,
-                      });
+                      setDraftPerms({ ...DEFAULT_PERMS, ...selectedUser.perms });
                       setDirty(false);
                     }}
                     style={{
@@ -786,13 +1084,7 @@ const updateUser = async () => {
                     تراجع
                   </button>
                   {dirty && (
-                    <span
-                      style={{
-                        fontSize: "12px",
-                        color: "#f59e0b",
-                        alignSelf: "center",
-                      }}
-                    >
+                    <span style={{ fontSize: "12px", color: "#f59e0b", alignSelf: "center" }}>
                       يوجد تغييرات غير محفوظة
                     </span>
                   )}
@@ -803,355 +1095,170 @@ const updateUser = async () => {
         </div>
       </div>
 
-{showAddModal && (
-  <div
-    onClick={() => {
-      setShowAddModal(false);
-      setEditingUser(null);
-    }}
-    style={{
-      position: "fixed",
-      inset: 0,
-      background: "rgba(0,0,0,0.6)",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      zIndex: 999,
-    }}
-  >
-    <div
-      onClick={(e) => e.stopPropagation()}
-      style={{
-        background: "#0f1424",
-        border: "1px solid rgba(255,255,255,0.1)",
-        borderRadius: "20px",
-        padding: "28px",
-        width: "420px",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          marginBottom: "20px",
-        }}
-      >
-        <h3 style={{ fontSize: "16px", fontWeight: "700" }}>
-          {editingUser ? "تعديل بيانات الحساب" : "إنشاء حساب جديد"}
-        </h3>
-        <button
+      {/* Add / Edit User Modal */}
+      {showAddModal && (
+        <div
           onClick={() => {
             setShowAddModal(false);
             setEditingUser(null);
           }}
-          style={{
-            background: "none",
-            border: "none",
-            color: "#64748b",
-            cursor: "pointer",
-          }}
-        >
-          <X size={18} />
-        </button>
-      </div>
-
-      {/* حقل اسم المستخدم - يظهر في الحالتين */}
-<div style={{ marginBottom: "14px" }}>
-  <label style={{ fontSize: "12px", color: "#94a3b8", display: "block", marginBottom: "6px" }}>
-    اسم المستخدم
-  </label>
-  <input
-    type="text"
-    value={newUser.username}
-    onChange={(e) => setNewUser(p => ({ ...p, username: e.target.value }))}
-    style={{
-      width: "100%",
-      background: "#080a10",
-      border: "1px solid #2d364f",
-      color: "white",
-      borderRadius: "10px",
-      padding: "11px 14px",
-      fontSize: "14px",
-      outline: "none"
-    }}
-  />
-</div>
-
-{/* حقل كلمة المرور - يظهر فقط إذا لم نكن في وضع التعديل */}
-{!editingUser && (
-  <div style={{ marginBottom: "14px" }}>
-    <label style={{ fontSize: "12px", color: "#94a3b8", display: "block", marginBottom: "6px" }}>
-      كلمة المرور
-    </label>
-    <input
-      type="password"
-      placeholder="••••••••"
-      value={newUser.password}
-      onChange={(e) => setNewUser(p => ({ ...p, password: e.target.value }))}
-      style={{
-        width: "100%",
-        background: "#080a10",
-        border: "1px solid #2d364f",
-        color: "white",
-        borderRadius: "10px",
-        padding: "11px 14px",
-        fontSize: "14px",
-        outline: "none"
-      }}
-    />
-  </div>
-)}
-
-      <div style={{ marginBottom: "20px" }}>
-        <label
-          style={{
-            fontSize: "12px",
-            color: "#94a3b8",
-            display: "block",
-            marginBottom: "6px",
-          }}
-        >
-          مستوى الصلاحية
-        </label>
-        <select
-          value={newUser.role}
-          onChange={(e) =>
-            setNewUser((p) => ({ ...p, role: e.target.value }))
-          }
-          style={{
-            width: "100%",
-            background: "#080a10",
-            border: "1px solid #2d364f",
-            color: "white",
-            borderRadius: "10px",
-            padding: "11px 14px",
-            fontSize: "14px",
-            outline: "none",
-          }}
-        >
-          <option value="User">مستخدم عادي — صلاحيات محددة</option>
-          <option value="Admin">مدير النظام — صلاحيات كاملة</option>
-        </select>
-      </div>
-
-      <button
-        onClick={editingUser ? updateUser : addUser}
-        style={{
-          width: "100%",
-          padding: "13px",
-          background: editingUser ? "#2d5f9e" : "#1e3a5f",
-          border: "1px solid #2d5f9e",
-          color: "white",
-          borderRadius: "12px",
-          fontSize: "14px",
-          fontWeight: "700",
-          cursor: "pointer",
-        }}
-      >
-        {editingUser ? "حفظ التعديلات" : "إنشاء الحساب"}
-      </button>
-    </div>
-  </div>
-)}
-
-      {showPassModal && (
-        <div
-          onClick={() => setShowPassModal(false)}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.6)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 999,
-          }}
+          className="blur-overlay"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            style={{
-              background: "#0f1424",
-              border: "1px solid rgba(255,255,255,0.1)",
-              borderRadius: "20px",
-              padding: "28px",
-              width: "380px",
-            }}
+            className="cyber-modal"
+            style={{ maxWidth: "420px", width: "100%" }}
           >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                marginBottom: "20px",
-              }}
-            >
-              <h3 style={{ fontSize: "16px", fontWeight: "700" }}>
-                تغيير كلمة المرور
-              </h3>
+            <div className="modal-cyber-header">
+              <h3>{editingUser ? "تعديل بيانات الحساب" : "إنشاء حساب جديد"}</h3>
               <button
-                onClick={() => setShowPassModal(false)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "#64748b",
-                  cursor: "pointer",
+                onClick={() => {
+                  setShowAddModal(false);
+                  setEditingUser(null);
                 }}
+                className="modal-close-btn"
               >
                 <X size={18} />
               </button>
             </div>
-            {[
-              { label: "كلمة المرور الحالية", field: "oldPass" },
-              { label: "كلمة المرور الجديدة", field: "newPass" },
-            ].map((f) => (
-              <div
-                key={f.field}
-                style={{ marginBottom: "14px", position: "relative" }}
-              >
-                <label
-                  style={{
-                    fontSize: "12px",
-                    color: "#94a3b8",
-                    display: "block",
-                    marginBottom: "6px",
-                  }}
-                >
-                  {f.label}
-                </label>
+            <div className="cyber-form">
+              <div className="cyber-input-group">
+                <label>اسم المستخدم</label>
                 <input
-                  type={showPass ? "text" : "password"}
-                  value={passForm[f.field]}
-                  placeholder="••••••••"
-                  onChange={(e) =>
-                    setPassForm((p) => ({ ...p, [f.field]: e.target.value }))
-                  }
+                  type="text"
+                  value={newUser.username}
+                  onChange={(e) => setNewUser((p) => ({ ...p, username: e.target.value }))}
+                />
+              </div>
+              {!editingUser && (
+                <div className="cyber-input-group">
+                  <label>كلمة المرور</label>
+                  <input
+                    type="password"
+                    placeholder="••••••••"
+                    value={newUser.password}
+                    onChange={(e) => setNewUser((p) => ({ ...p, password: e.target.value }))}
+                  />
+                </div>
+              )}
+              <div className="cyber-input-group">
+                <label>مستوى الصلاحية</label>
+                <select
+                  value={newUser.role}
+                  onChange={(e) => setNewUser((p) => ({ ...p, role: e.target.value }))}
                   style={{
                     width: "100%",
                     background: "#080a10",
                     border: "1px solid #2d364f",
                     color: "white",
                     borderRadius: "10px",
-                    padding: "11px 40px 11px 14px",
+                    padding: "11px 14px",
                     fontSize: "14px",
                     outline: "none",
                   }}
-                />
-                <button
-                  onClick={() => setShowPass(!showPass)}
-                  style={{
-                    position: "absolute",
-                    left: "12px",
-                    top: "34px",
-                    background: "none",
-                    border: "none",
-                    color: "#64748b",
-                    cursor: "pointer",
-                  }}
                 >
-                  {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                  <option value="User">مستخدم عادي — صلاحيات محددة</option>
+                  <option value="Admin">مدير النظام — صلاحيات كاملة</option>
+                </select>
+              </div>
+              <div className="cyber-modal-actions">
+                <button
+                  onClick={editingUser ? updateUser : addUser}
+                  className="cyber-btn-submit"
+                >
+                  {editingUser ? "حفظ التعديلات" : "إنشاء الحساب"}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowAddModal(false);
+                    setEditingUser(null);
+                  }}
+                  className="cyber-btn-dismiss"
+                >
+                  إلغاء
                 </button>
               </div>
-            ))}
-            <button
-              onClick={changePass}
-              style={{
-                width: "100%",
-                padding: "13px",
-                background: "#1c3d2e",
-                border: "1px solid rgba(34,197,94,0.3)",
-                color: "#4ade80",
-                borderRadius: "12px",
-                fontSize: "14px",
-                fontWeight: "700",
-                cursor: "pointer",
-                marginTop: "6px",
-              }}
-            >
-              تأكيد التغيير
-            </button>
+            </div>
           </div>
         </div>
       )}
 
+      {/* Change Password Modal */}
+      {showPassModal && (
+        <div onClick={() => setShowPassModal(false)} className="blur-overlay">
+          <div onClick={(e) => e.stopPropagation()} className="cyber-modal">
+            <div className="modal-cyber-header">
+              <h3>تغيير كلمة المرور</h3>
+              <button onClick={() => setShowPassModal(false)} className="modal-close-btn">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="cyber-form">
+              {["oldPass", "newPass"].map((f) => (
+                <div key={f} className="cyber-input-group" style={{ position: "relative" }}>
+                  <label>{f === "oldPass" ? "كلمة المرور الحالية" : "كلمة المرور الجديدة"}</label>
+                  <input
+                    type={showPass ? "text" : "password"}
+                    value={passForm[f]}
+                    placeholder="••••••••"
+                    onChange={(e) => setPassForm((p) => ({ ...p, [f]: e.target.value }))}
+                  />
+                  <button
+                    onClick={() => setShowPass(!showPass)}
+                    style={{
+                      position: "absolute",
+                      left: "12px",
+                      top: "34px",
+                      background: "none",
+                      border: "none",
+                      color: "#64748b",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              ))}
+              <div className="cyber-modal-actions">
+                <button onClick={changePass} className="cyber-btn-submit">
+                  تأكيد التغيير
+                </button>
+                <button onClick={() => setShowPassModal(false)} className="cyber-btn-dismiss">
+                  إلغاء
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
       {showDeleteModal && deleteTarget && (
-        <div
-          onClick={() => setShowDeleteModal(false)}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.6)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 999,
-          }}
-        >
+        <div onClick={() => setShowDeleteModal(false)} className="blur-overlay">
           <div
             onClick={(e) => e.stopPropagation()}
-            style={{
-              background: "#0f1424",
-              border: "1px solid rgba(239,68,68,0.3)",
-              borderRadius: "20px",
-              padding: "28px",
-              width: "380px",
-              textAlign: "center",
-            }}
+            className="cyber-modal"
+            style={{ maxWidth: "380px", textAlign: "center" }}
           >
-            <Trash2
-              size={40}
-              style={{ color: "#f87171", marginBottom: "12px" }}
-            />
-            <h3
-              style={{
-                fontSize: "16px",
-                fontWeight: "700",
-                marginBottom: "8px",
-              }}
-            >
-              حذف حساب "{deleteTarget.username}"؟
-            </h3>
-            <p
-              style={{
-                fontSize: "13px",
-                color: "#64748b",
-                marginBottom: "24px",
-                lineHeight: "1.6",
-              }}
-            >
-              سيتم حذف الحساب وجميع صلاحياته نهائياً. هذا الإجراء لا يمكن
-              التراجع عنه.
-            </p>
-            <div style={{ display: "flex", gap: "10px" }}>
-              <button
-                onClick={deleteUser}
-                style={{
-                  flex: 1,
-                  padding: "12px",
-                  background: "rgba(239,68,68,0.15)",
-                  border: "1px solid rgba(239,68,68,0.4)",
-                  color: "#f87171",
-                  borderRadius: "12px",
-                  cursor: "pointer",
-                  fontSize: "14px",
-                  fontWeight: "700",
-                }}
-              >
-                تأكيد الحذف
+            <div className="modal-cyber-header">
+              <h3 style={{ color: "#f87171" }}>حذف حساب "{deleteTarget.username}"؟</h3>
+              <button onClick={() => setShowDeleteModal(false)} className="modal-close-btn">
+                <X size={18} />
               </button>
-              <button
-                onClick={() => setShowDeleteModal(false)}
-                style={{
-                  flex: 1,
-                  padding: "12px",
-                  background: "rgba(255,255,255,0.05)",
-                  border: "1px solid rgba(255,255,255,0.1)",
-                  color: "#94a3b8",
-                  borderRadius: "12px",
-                  cursor: "pointer",
-                  fontSize: "14px",
-                }}
-              >
-                تراجع
-              </button>
+            </div>
+            <div className="cyber-form">
+              <Trash2 size={40} style={{ color: "#f87171", margin: "0 auto 12px" }} />
+              <p style={{ fontSize: "13px", color: "#64748b", lineHeight: "1.6", textAlign: "center" }}>
+                سيتم حذف الحساب وجميع صلاحياته نهائياً. هذا الإجراء لا يمكن التراجع عنه.
+              </p>
+              <div className="cyber-modal-actions">
+                <button onClick={deleteUser} className="cyber-btn-submit danger-bg">
+                  تأكيد الحذف
+                </button>
+                <button onClick={() => setShowDeleteModal(false)} className="cyber-btn-dismiss">
+                  تراجع
+                </button>
+              </div>
             </div>
           </div>
         </div>

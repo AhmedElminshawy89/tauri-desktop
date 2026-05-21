@@ -17,18 +17,18 @@ const ExpensesPage = ({ showToast }) => {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // Modals: addExpense | addCategory | deleteConfirm (expense) | deleteCategoryConfirm
+  // Modals
   const [modalType, setModalType] = useState(null); 
   const [selectedExpense, setSelectedExpense] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(null);
   
-  // Filters State
+  // Filters
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCategory, setFilterCategory] = useState("all");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
-  // Forms State
+  // Forms
   const [expenseForm, setExpenseForm] = useState({
     amount: "", category_id: "", note: "",
     date: new Date().toISOString().split('T')[0]
@@ -57,7 +57,6 @@ const ExpensesPage = ({ showToast }) => {
 
   useEffect(() => { fetchData(); }, []);
 
-  // --- Logic: Filtering ---
   const filteredExpenses = useMemo(() => {
     return expenses.filter(e => {
       const matchSearch = e.note?.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -79,7 +78,6 @@ const ExpensesPage = ({ showToast }) => {
     return { totalFiltered, thisMonth, count: filteredExpenses.length };
   }, [filteredExpenses, expenses]);
 
-  // --- Actions ---
   const handleAddExpense = async (e) => {
     e.preventDefault();
     if (!expenseForm.amount || !expenseForm.category_id) return showToast?.("برجاء إدخال المبلغ والفئة", "error");
@@ -139,182 +137,469 @@ const ExpensesPage = ({ showToast }) => {
   };
 
   return (
-    <div dir="rtl" className="page-container animate-fade-in" style={{ padding: "25px", color: "white", minHeight: "100vh" ,background:'#0f172a'}}>
-      
+    <div className="page-container animate-fade-in" dir="rtl">
+      <style>{`
+        /* ========== GLASS/CYBER THEME (consistent with all pages) ========== */
+        .page-container {
+          padding: 24px;
+          background: transparent;
+          min-height: 100vh;
+          color: #e2e8f0;
+          font-family: system-ui, -apple-system, sans-serif;
+        }
+        .premium-stats-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+          gap: 20px;
+          margin-bottom: 32px;
+        }
+        .premium-stat-card {
+          position: relative;
+          background: rgba(15, 23, 42, 0.45);
+          backdrop-filter: blur(12px);
+          border: 1px solid rgba(255, 255, 255, 0.06);
+          border-radius: 16px;
+          padding: 20px;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .premium-stat-card:hover {
+          transform: translateY(-4px);
+          border-color: rgba(255, 255, 255, 0.15);
+          box-shadow: 0 12px 24px -10px rgba(0,0,0,0.6);
+        }
+        .stat-glow {
+          position: absolute;
+          width: 80px;
+          height: 80px;
+          border-radius: 50%;
+          top: -20px;
+          right: -20px;
+          filter: blur(40px);
+          opacity: 0.15;
+          transition: opacity 0.3s ease;
+        }
+        .premium-stat-card:hover .stat-glow { opacity: 0.3; }
+        .card-expense-red .stat-glow { background: #ef4444; }
+        .card-expense-blue .stat-glow { background: #3b82f6; }
+        .card-expense-cyan .stat-glow { background: #06b6d4; }
+        .stat-content { display: flex; align-items: center; gap: 16px; position: relative; z-index: 1; }
+        .icon-box {
+          width: 48px;
+          height: 48px;
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: rgba(255,255,255,0.03);
+          border: 1px solid rgba(255,255,255,0.08);
+        }
+        .card-expense-red .icon-box { color: #f87171; background: rgba(239,68,68,0.1); }
+        .card-expense-blue .icon-box { color: #60a5fa; background: rgba(59,130,246,0.1); }
+        .card-expense-cyan .icon-box { color: #22d3ee; background: rgba(6,182,212,0.1); }
+        .stat-details { flex: 1; }
+        .stat-label { font-size: 13px; color: #94a3b8; }
+        .stat-value { font-size: 20px; font-weight: 700; color: #f8fafc; }
+        .page-header-container {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 24px;
+          padding: 20px 28px;
+          background: rgba(30, 41, 59, 0.3);
+          border-radius: 16px;
+          border: 1px solid rgba(255,255,255,0.05);
+          backdrop-filter: blur(8px);
+        }
+        .main-title { font-size: 1.5rem; font-weight: 800; margin: 0; }
+        .sub-title { color: #94a3b8; font-size: 0.9rem; margin: 4px 0 0; }
+        .header-actions-group {
+          display: flex;
+          gap: 12px;
+          align-items: center;
+        }
+        .btn-action-neon {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 11px 20px;
+          border-radius: 12px;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          border: none;
+        }
+        .btn-primary { background: #2563eb; color: #ffffff; }
+        .btn-primary:hover { background: #1d4ed8; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(37,99,235,0.3); }
+        .btn-secondary { background: #1e293b; color: #94a3b8; }
+        .btn-secondary:hover { background: #334155; color: white; }
+        .premium-control-bar {
+          background: rgba(15, 23, 42, 0.4);
+          backdrop-filter: blur(10px);
+          border: 1px solid rgba(255, 255, 255, 0.05);
+          border-radius: 16px;
+          padding: 18px 24px;
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: space-between;
+          align-items: center;
+          gap: 20px;
+          margin-bottom: 24px;
+        }
+        .search-neon-wrapper { position: relative; }
+        .search-neon-input {
+          background: #0b0f19;
+          border: 1px solid #1e293b;
+          border-radius: 12px;
+          padding: 11px 42px 11px 16px;
+          width: 280px;
+          color: #f1f5f9;
+          font-size: 13.5px;
+          transition: all 0.25s ease;
+        }
+        .search-neon-input:focus {
+          border-color: #3b82f6;
+          box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+          outline: none;
+        }
+        .expense-item {
+          background: rgba(22,27,44,0.6);
+          border: 1px solid rgba(255,255,255,0.05);
+          border-radius: 14px;
+          padding: 16px;
+          margin-bottom: 10px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          transition: all 0.2s;
+        }
+        .expense-item:hover {
+          background: rgba(30,41,59,0.7);
+          border-color: rgba(59,130,246,0.3);
+        }
+        .expense-amount {
+          font-size: 16px;
+          font-weight: 700;
+          color: #f87171;
+        }
+        .expense-category-badge {
+          background: rgba(255,255,255,0.05);
+          padding: 2px 8px;
+          border-radius: 20px;
+          font-size: 11px;
+          color: #94a3b8;
+        }
+        .blur-overlay {
+          position: fixed;
+          top: 0; left: 0; right: 0; bottom: 0;
+          background: rgba(5, 8, 16, 0.75);
+          backdrop-filter: blur(8px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+          padding: 16px;
+        }
+        .cyber-modal {
+          background: #0f172a;
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 24px;
+          width: 100%;
+          max-width: 480px;
+          overflow: hidden;
+          box-shadow: 0 25px 50px -12px rgba(0,0,0,0.8);
+        }
+        .modal-cyber-header {
+          padding: 18px 24px;
+          background: rgba(255,255,255,0.02);
+          border-bottom: 1px solid rgba(255,255,255,0.05);
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        .modal-cyber-header h3 { margin: 0; font-size: 18px; font-weight: 700; color: white; }
+        .modal-close-btn { background: none; border: none; color: #64748b; cursor: pointer; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+        .modal-close-btn:hover { background: rgba(255,255,255,0.05); color: white; }
+        .cyber-form { padding: 24px; display: flex; flex-direction: column; gap: 18px; }
+        .cyber-input-group { display: flex; flex-direction: column; gap: 8px; }
+        .cyber-input-group label { font-size: 13px; color: #94a3b8; }
+        .cyber-input-group input, .cyber-input-group select, .cyber-input-group textarea {
+          background: #070a12;
+          border: 1px solid #1e293b;
+          border-radius: 10px;
+          padding: 12px;
+          color: white;
+          font-size: 14px;
+          transition: border 0.2s ease;
+        }
+        .cyber-input-group input:focus, .cyber-input-group select:focus, .cyber-input-group textarea:focus {
+          border-color: #2563eb;
+          outline: none;
+        }
+        .cyber-modal-actions { display: flex; gap: 12px; margin-top: 8px; }
+        .cyber-btn-submit { flex: 1; padding: 12px; border-radius: 10px; background: #2563eb; color: white; font-weight: 600; border: none; cursor: pointer; }
+        .cyber-btn-submit.danger-bg { background: #ef4444; }
+        .cyber-btn-submit.danger-bg:hover { background: #dc2626; }
+        .cyber-btn-dismiss { padding: 12px 20px; border-radius: 10px; background: #1e293b; color: #94a3b8; font-weight: 600; border: none; cursor: pointer; }
+        .cyber-btn-dismiss:hover { background: #334155; color: white; }
+        .animate-fade-in { animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes scaleUp { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .spin { animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+      `}</style>
+
       {/* Header */}
       <div className="page-header-container">
         <div className="header-title-section">
-          <h2 style={{ fontSize: "24px", fontWeight: "800", margin: 0 }}>إدارة المصروفات</h2>
-          <p style={{ color: "#64748b", fontSize: "14px", marginTop: "5px" }}>تتبع جميع المصاريف التشغيلية للمحل</p>
+          <h2 className="main-title">إدارة المصروفات</h2>
+          <p className="sub-title">تتبع جميع المصاريف التشغيلية للمحل</p>
         </div>
-        <div style={{ display: "flex", gap: "12px" }}>
-            <button onClick={() => setModalType("addCategory")} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 15px", borderRadius: "12px", border: "1px solid #2d364f", color: "#94a3b8", cursor: "pointer", background: "#161b2c" }}>
-                <Tag size={18} /> الفئات
-            </button>
-            <button onClick={() => setModalType("addExpense")} className="btn-save">
-                <Plus size={18} /> إضافة مصروف
-            </button>
+        <div className="header-actions-group">
+          <button onClick={() => setModalType("addCategory")} className="btn-action-neon btn-secondary">
+            <Tag size={18} /> الفئات
+          </button>
+          <button onClick={() => setModalType("addExpense")} className="btn-action-neon btn-primary">
+            <Plus size={18} /> إضافة مصروف
+          </button>
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "20px", marginBottom: "30px" }}>
-        <div style={{ background: "linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(239, 68, 68, 0.05) 100%)", border: "1px solid rgba(239, 68, 68, 0.2)", borderRadius: "20px", padding: "20px" }}>
-            <span style={{ color: "#f87171", fontSize: "14px" }}>إجمالي مصروفات الشهر</span>
-            <div style={{ fontSize: "28px", fontWeight: "800", marginTop: "10px" }}>{fmt(stats.thisMonth)}</div>
+      <div className="premium-stats-grid">
+        <div className="premium-stat-card card-expense-red">
+          <div className="stat-glow"></div>
+          <div className="stat-content">
+            <div className="icon-box"><Receipt size={24} /></div>
+            <div className="stat-details">
+              <div className="stat-label">إجمالي مصروفات الشهر</div>
+              <div className="stat-value" style={{ color: "#f87171" }}>{fmt(stats.thisMonth)}</div>
+            </div>
+          </div>
         </div>
-        <div style={{ background: "rgba(22, 27, 44, 0.6)", border: "1px solid #2d364f", borderRadius: "20px", padding: "20px" }}>
-            <span style={{ color: "#64748b", fontSize: "14px" }}>إجمالي البحث الحالي</span>
-            <div style={{ fontSize: "28px", fontWeight: "800", marginTop: "10px", color: "#60a5fa" }}>{fmt(stats.totalFiltered)}</div>
+        <div className="premium-stat-card card-expense-blue">
+          <div className="stat-glow"></div>
+          <div className="stat-content">
+            <div className="icon-box"><Search size={24} /></div>
+            <div className="stat-details">
+              <div className="stat-label">إجمالي البحث الحالي</div>
+              <div className="stat-value" style={{ color: "#60a5fa" }}>{fmt(stats.totalFiltered)}</div>
+            </div>
+          </div>
         </div>
-        <div style={{ background: "rgba(96, 165, 250, 0.1)", border: "1px solid rgba(96, 165, 250, 0.2)", borderRadius: "20px", padding: "20px" }}>
-            <span style={{ color: "#60a5fa", fontSize: "14px" }}>إجمالي الفترة المختارة</span>
-            <div style={{ fontSize: "28px", fontWeight: "800", marginTop: "10px" }}>{fmt(stats.totalFiltered)}</div>
+        <div className="premium-stat-card card-expense-cyan">
+          <div className="stat-glow"></div>
+          <div className="stat-content">
+            <div className="icon-box"><Calendar size={24} /></div>
+            <div className="stat-details">
+              <div className="stat-label">إجمالي الفترة المختارة</div>
+              <div className="stat-value" style={{ color: "#22d3ee" }}>{fmt(stats.totalFiltered)}</div>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Filters Bar */}
-      <div style={{ background: "#161b2c", padding: "15px", borderRadius: "15px", border: "1px solid #2d364f", marginBottom: "20px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
-        <div style={{ flex: 2, minWidth: "200px", position: "relative" }}>
-            <Search style={{ position: "absolute", right: "12px", top: "12px", color: "#475569" }} size={18} />
-            <input 
-                type="text" placeholder="بحث في الملاحظات أو الفئات..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-                style={{ width: "100%", background: "#0f172a", border: "1px solid #1e293b", borderRadius: "10px", color: "white", padding: "10px 40px 10px 10px" }}
-            />
+      <div className="premium-control-bar">
+        <div className="search-neon-wrapper" style={{ flex: 2 }}>
+          <input
+            type="text"
+            placeholder="بحث في الملاحظات أو الفئات..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="search-neon-input"
+            style={{ width: "100%" }}
+          />
+          <Search size={18} className="search-icon" style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", color: "#64748b" }} />
         </div>
-        <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} style={{ flex: 1, background: "#0f172a", border: "1px solid #1e293b", borderRadius: "10px", color: "white", padding: "10px" }}>
-            <option value="all">جميع الفئات</option>
-            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        <select
+          value={filterCategory}
+          onChange={(e) => setFilterCategory(e.target.value)}
+          className="search-neon-input"
+          style={{ width: "180px" }}
+        >
+          <option value="all">جميع الفئات</option>
+          {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-        <div style={{ display: "flex", gap: "5px", flex: 2 }}>
-            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ flex: 1, background: "#0f172a", border: "1px solid #1e293b", borderRadius: "10px", color: "white", padding: "10px" }} />
-            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ flex: 1, background: "#0f172a", border: "1px solid #1e293b", borderRadius: "10px", color: "white", padding: "10px" }} />
+        <div style={{ display: "flex", gap: "8px" }}>
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="search-neon-input"
+            style={{ width: "140px" }}
+          />
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            className="search-neon-input"
+            style={{ width: "140px" }}
+          />
         </div>
-        <button onClick={() => { setSearchTerm(""); setFilterCategory("all"); setStartDate(""); setEndDate(""); }} style={{ background: "#1e293b", border: "none", color: "#94a3b8", padding: "10px 15px", borderRadius: "10px", cursor: "pointer" }}>
-            <RefreshCcw size={18} />
+        <button
+          onClick={() => { setSearchTerm(""); setFilterCategory("all"); setStartDate(""); setEndDate(""); }}
+          className="btn-action-neon btn-secondary"
+        >
+          <RefreshCcw size={18} />
         </button>
       </div>
 
-      {/* List */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-        {loading ? (
-            <div style={{ textAlign: "center", padding: "40px", color: "#64748b" }}>جاري تحميل البيانات...</div>
-        ) : filteredExpenses.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "40px", color: "#64748b", border: "2px dashed #2d364f", borderRadius: "15px" }}>لا توجد مصروفات مسجلة تطابق بحثك</div>
-        ) : (
-            filteredExpenses.map(exp => (
-                <div key={exp.id} style={{ background: "rgba(22, 27, 44, 0.4)", border: "1px solid #2d364f", borderRadius: "12px", padding: "15px", display: "flex", justifyContent: "space-between", alignItems: "center", transition: "0.3s" }}>
-                    <div style={{ display: "flex", gap: "15px", alignItems: "center" }}>
-                        <div style={{ background: "#ef444415", padding: "10px", borderRadius: "10px" }}><Receipt color="#ef4444" size={20} /></div>
-                        <div>
-                            <div style={{ fontWeight: "700", fontSize: "16px" }}>{fmt(exp.amount)} <span style={{ fontSize: "11px", color: "#64748b", marginRight: "10px", background: "#0f172a", padding: "2px 8px", borderRadius: "5px" }}>{exp.category_name}</span></div>
-                            <div style={{ fontSize: "13px", color: "#94a3b8", marginTop: "3px" }}>{exp.note || "لا توجد ملاحظات"}</div>
-                        </div>
-                    </div>
-                    <div style={{ display: "flex", gap: "20px", alignItems: "center" }}>
-                        <span style={{ fontSize: "12px", color: "#475569" }}>{fmtDate(exp.expense_date)}</span>
-                        <button 
-                            onClick={() => { setSelectedExpense(exp); setModalType("deleteConfirm"); }} 
-                            style={{ background: "none", border: "none", color: "#475569", cursor: "pointer" }}
-                            className="hover-red"
-                        >
-                            <Trash2 size={18} />
-                        </button>
-                    </div>
-                </div>
-            ))
-        )}
-      </div>
-
-      {/* --- MODAL: Confirm Delete Expense --- */}
-      {modalType === "deleteConfirm" && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100 }}>
-          <div style={{ background: "#0f172a", width: "380px", borderRadius: "24px", border: "1px solid #1e293b", padding: "25px", textAlign: "center", animation: "scaleUp 0.2s ease-out" }}>
-            <div style={{ background: "#ef444420", width: "60px", height: "60px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 15px" }}>
-              <AlertCircle size={30} color="#ef4444" />
-            </div>
-            <h3 style={{ margin: "0 0 10px 0" }}>تأكيد الحذف</h3>
-            <p style={{ color: "#94a3b8", fontSize: "14px" }}>هل أنت متأكد من حذف هذا المصروف بقيمة <br/> <b style={{color: "white"}}>{fmt(selectedExpense?.amount)}</b>؟</p>
-            <div style={{ display: "flex", gap: "10px", marginTop: "25px" }}>
-              <button onClick={confirmDeleteExpense} style={{ flex: 1, background: "#ef4444", color: "white", border: "none", padding: "12px", borderRadius: "12px", fontWeight: "bold", cursor: "pointer" }}>حذف نهائي</button>
-              <button onClick={() => setModalType(null)} style={{ flex: 1, background: "#1e293b", color: "#94a3b8", border: "1px solid #334155", padding: "12px", borderRadius: "12px", cursor: "pointer" }}>إلغاء</button>
+      {/* Expenses List */}
+      {loading ? (
+        <div className="cyber-table-container" style={{ textAlign: "center", padding: "60px" }}>
+          <div className="loader">جاري تحميل البيانات...</div>
+        </div>
+      ) : filteredExpenses.length === 0 ? (
+        <div className="cyber-table-container" style={{ textAlign: "center", padding: "60px", color: "#64748b", border: "2px dashed rgba(255,255,255,0.05)" }}>
+          لا توجد مصروفات مسجلة تطابق بحثك
+        </div>
+      ) : (
+        <div className="cyber-table-container" style={{ padding: "0" }}>
+          <div style={{ padding: "16px 20px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <Receipt size={18} /> سجل المصروفات
             </div>
           </div>
+          {filteredExpenses.map(exp => (
+            <div key={exp.id} className="expense-item">
+              <div style={{ display: "flex", gap: "15px", alignItems: "center", flex: 1 }}>
+                <div className="icon-box" style={{ width: "40px", height: "40px", background: "rgba(239,68,68,0.1)", color: "#f87171" }}>
+                  <Receipt size={18} />
+                </div>
+                <div>
+                  <div style={{ fontWeight: "700", fontSize: "15px", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                    <span className="expense-amount">{fmt(exp.amount)}</span>
+                    <span className="expense-category-badge">{exp.category_name}</span>
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#94a3b8", marginTop: "4px" }}>{exp.note || "لا توجد ملاحظات"}</div>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: "20px", alignItems: "center" }}>
+                <span style={{ fontSize: "12px", color: "#64748b" }}>{fmtDate(exp.expense_date)}</span>
+                <button
+                  onClick={() => { setSelectedExpense(exp); setModalType("deleteConfirm"); }}
+                  className="cyber-btn-mini delete"
+                  style={{ background: "transparent", border: "none", color: "#64748b", cursor: "pointer", width: "32px", height: "32px", borderRadius: "8px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+                >
+                  <Trash2 size={18} />
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
-      {/* --- MODAL: Add Expense --- */}
+      {/* Modal: Add Expense */}
       {modalType === "addExpense" && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-          <div style={{ background: "#0f172a", width: "450px", borderRadius: "20px", border: "1px solid #1e293b", padding: "25px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "25px" }}>
-              <h3 style={{ margin: 0 }}>تسجيل مصروف جديد</h3>
-              <X style={{ cursor: "pointer", color: "#475569" }} onClick={() => setModalType(null)} />
+        <div className="blur-overlay" onClick={() => setModalType(null)}>
+          <div className="cyber-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-cyber-header">
+              <h3>تسجيل مصروف جديد</h3>
+              <button className="modal-close-btn" onClick={() => setModalType(null)}><X size={18} /></button>
             </div>
-            <form onSubmit={handleAddExpense} style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
-              <input type="number" placeholder="المبلغ" required value={expenseForm.amount} onChange={e => setExpenseForm({...expenseForm, amount: e.target.value})} style={{ background: "#1e293b", border: "1px solid #334155", padding: "12px", borderRadius: "10px", color: "white" }} />
-              <select required value={expenseForm.category_id} onChange={e => setExpenseForm({...expenseForm, category_id: e.target.value})} style={{ background: "#1e293b", border: "1px solid #334155", padding: "12px", borderRadius: "10px", color: "white" }}>
-                <option value="">اختر الفئة...</option>
-                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-              <input type="date" value={expenseForm.date} onChange={e => setExpenseForm({...expenseForm, date: e.target.value})} style={{ background: "#1e293b", border: "1px solid #334155", padding: "12px", borderRadius: "10px", color: "white" }} />
-              <textarea placeholder="ملاحظات" value={expenseForm.note} onChange={e => setExpenseForm({...expenseForm, note: e.target.value})} style={{ background: "#1e293b", border: "1px solid #334155", padding: "12px", borderRadius: "10px", color: "white", height: "80px" }} />
-              <button type="submit" className="btn-save" style={{ background: "#ef4444", border: "none", color: "white", padding: "15px", borderRadius: "12px", fontWeight: "bold", cursor: "pointer" }}>حفظ العملية</button>
+            <form onSubmit={handleAddExpense}>
+              <div className="cyber-form">
+                <div className="cyber-input-group">
+                  <label>المبلغ</label>
+                  <input type="number" placeholder="المبلغ" required value={expenseForm.amount} onChange={e => setExpenseForm({...expenseForm, amount: e.target.value})} />
+                </div>
+                <div className="cyber-input-group">
+                  <label>الفئة</label>
+                  <select required value={expenseForm.category_id} onChange={e => setExpenseForm({...expenseForm, category_id: e.target.value})}>
+                    <option value="">اختر الفئة...</option>
+                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div className="cyber-input-group">
+                  <label>التاريخ</label>
+                  <input type="date" value={expenseForm.date} onChange={e => setExpenseForm({...expenseForm, date: e.target.value})} />
+                </div>
+                <div className="cyber-input-group">
+                  <label>ملاحظات</label>
+                  <textarea rows="3" placeholder="ملاحظات..." value={expenseForm.note} onChange={e => setExpenseForm({...expenseForm, note: e.target.value})} />
+                </div>
+                <div className="cyber-modal-actions">
+                  <button type="submit" className="cyber-btn-submit danger-bg" style={{ background: "#ef4444" }}>حفظ العملية</button>
+                  <button type="button" className="cyber-btn-dismiss" onClick={() => setModalType(null)}>إلغاء</button>
+                </div>
+              </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* --- MODAL: Manage Categories --- */}
+      {/* Modal: Manage Categories */}
       {modalType === "addCategory" && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-          <div style={{ background: "#0f172a", width: "400px", borderRadius: "20px", border: "1px solid #1e293b", padding: "25px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "20px" }}>
-              <h3 style={{ margin: 0 }}>إدارة فئات المصروفات</h3>
-              <X style={{ cursor: "pointer" }} onClick={() => setModalType(null)} />
+        <div className="blur-overlay" onClick={() => setModalType(null)}>
+          <div className="cyber-modal" style={{ maxWidth: "420px" }} onClick={e => e.stopPropagation()}>
+            <div className="modal-cyber-header">
+              <h3>إدارة فئات المصروفات</h3>
+              <button className="modal-close-btn" onClick={() => setModalType(null)}><X size={18} /></button>
             </div>
-            <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
-              <input type="text" placeholder="اسم الفئة الجديدة..." value={catName} onChange={e => setCatName(e.target.value)} style={{ flex: 1, background: "#1e293b", border: "1px solid #334155", padding: "12px", borderRadius: "10px", color: "white" }} />
-              <button onClick={handleAddCategory} className="btn-save" style={{ background: "#60a5fa", border: "none", padding: "12px 20px", borderRadius: "10px", fontWeight: "bold", cursor: "pointer", color: "white" }}>إضافة</button>
-            </div>
-            <div style={{ maxHeight: "250px", overflowY: "auto", borderTop: "1px solid #1e293b", paddingTop: "15px" }}>
-              {categories.map(c => (
-                <div key={c.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(30, 41, 59, 0.5)", padding: "10px 15px", borderRadius: "10px", marginBottom: "8px" }}>
+            <div className="cyber-form">
+              <div style={{ display: "flex", gap: "10px" }}>
+                <input type="text" placeholder="اسم الفئة الجديدة..." value={catName} onChange={e => setCatName(e.target.value)} className="search-neon-input" style={{ flex: 1 }} />
+                <button onClick={handleAddCategory} className="cyber-btn-submit" style={{ flex: "none", padding: "12px 20px" }}>إضافة</button>
+              </div>
+              <div style={{ maxHeight: "250px", overflowY: "auto", borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "12px", marginTop: "8px" }}>
+                {categories.map(c => (
+                  <div key={c.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", background: "rgba(255,255,255,0.03)", borderRadius: "10px", marginBottom: "8px" }}>
                     <span style={{ fontSize: "14px" }}>{c.name}</span>
-                    <button onClick={() => openDeleteCategoryModal(c)} style={{ background: "none", border: "none", color: "#475569", cursor: "pointer" }} className="hover-red">
-                        <Trash2 size={16} />
+                    <button onClick={() => openDeleteCategoryModal(c)} className="cyber-btn-mini delete" style={{ background: "transparent", border: "none", color: "#64748b", cursor: "pointer" }}>
+                      <Trash2 size={16} />
                     </button>
-                </div>
-              ))}
+                  </div>
+                ))}
+                {categories.length === 0 && <div style={{ textAlign: "center", color: "#64748b", padding: "20px" }}>لا توجد فئات بعد</div>}
+              </div>
+              <div className="cyber-modal-actions">
+                <button type="button" className="cyber-btn-dismiss" onClick={() => setModalType(null)}>إغلاق</button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* --- MODAL: Confirm Delete Category --- */}
+      {/* Modal: Delete Expense */}
+      {modalType === "deleteConfirm" && (
+        <div className="blur-overlay" onClick={() => setModalType(null)}>
+          <div className="cyber-modal" style={{ maxWidth: "380px", textAlign: "center" }} onClick={e => e.stopPropagation()}>
+            <div className="modal-cyber-header">
+              <h3 style={{ color: "#f87171" }}>تأكيد الحذف</h3>
+              <button className="modal-close-btn" onClick={() => setModalType(null)}><X size={18} /></button>
+            </div>
+            <div className="cyber-form" style={{ textAlign: "center" }}>
+              <AlertCircle size={48} style={{ color: "#f87171", margin: "0 auto 16px" }} />
+              <p style={{ fontSize: "14px", color: "#94a3b8" }}>هل أنت متأكد من حذف هذا المصروف بقيمة <strong style={{ color: "#f87171" }}>{fmt(selectedExpense?.amount)}</strong>؟</p>
+              <div className="cyber-modal-actions">
+                <button onClick={confirmDeleteExpense} className="cyber-btn-submit danger-bg">حذف نهائي</button>
+                <button onClick={() => setModalType(null)} className="cyber-btn-dismiss">إلغاء</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Delete Category */}
       {modalType === "deleteCategoryConfirm" && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1200 }}>
-          <div style={{ background: "#0f172a", width: "360px", borderRadius: "24px", border: "1px solid #1e293b", padding: "25px", textAlign: "center" }}>
-            <div style={{ background: "#ef444420", width: "60px", height: "60px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 15px" }}>
-              <AlertCircle size={30} color="#ef4444" />
+        <div className="blur-overlay" onClick={() => setModalType("addCategory")}>
+          <div className="cyber-modal" style={{ maxWidth: "380px", textAlign: "center" }} onClick={e => e.stopPropagation()}>
+            <div className="modal-cyber-header">
+              <h3 style={{ color: "#f87171" }}>حذف الفئة</h3>
+              <button className="modal-close-btn" onClick={() => setModalType("addCategory")}><X size={18} /></button>
             </div>
-            <h3 style={{ margin: "0 0 10px 0" }}>حذف الفئة</h3>
-            <p style={{ color: "#94a3b8", fontSize: "14px" }}>هل أنت متأكد من حذف فئة <br/> <b style={{color: "white"}}>"{selectedCategory?.name}"</b>؟</p>
-            <div style={{ display: "flex", gap: "10px", marginTop: "25px" }}>
-              <button onClick={confirmDeleteCategory} style={{ flex: 1, background: "#ef4444", color: "white", border: "none", padding: "12px", borderRadius: "12px", fontWeight: "bold", cursor: "pointer" }}>تأكيد الحذف</button>
-              <button onClick={() => setModalType("addCategory")} style={{ flex: 1, background: "#1e293b", color: "#94a3b8", border: "1px solid #334155", padding: "12px", borderRadius: "12px", cursor: "pointer" }}>إلغاء</button>
+            <div className="cyber-form" style={{ textAlign: "center" }}>
+              <AlertCircle size={48} style={{ color: "#f87171", margin: "0 auto 16px" }} />
+              <p style={{ fontSize: "14px", color: "#94a3b8" }}>هل أنت متأكد من حذف فئة <strong style={{ color: "#f87171" }}>"{selectedCategory?.name}"</strong>؟</p>
+              <div className="cyber-modal-actions">
+                <button onClick={confirmDeleteCategory} className="cyber-btn-submit danger-bg">تأكيد الحذف</button>
+                <button onClick={() => setModalType("addCategory")} className="cyber-btn-dismiss">إلغاء</button>
+              </div>
             </div>
           </div>
         </div>
       )}
-
-      <style>{`
-        @keyframes scaleUp { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-        .hover-red:hover { color: #ef4444 !important; }
-        .btn-save { transition: 0.3s; }
-        .btn-save:hover { opacity: 0.8; transform: translateY(-2px); }
-      `}</style>
-
     </div>
   );
 };

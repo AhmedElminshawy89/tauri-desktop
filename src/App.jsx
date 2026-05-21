@@ -25,6 +25,15 @@ import PurchasesPage from "./pages/PurchasesPage";
 import SuppliersPage from "./pages/SuppliersPage";
 import CommissionReport from "./pages/CommissionReport";
 import PendingInvoices from "./pages/PendingInvoices";
+import Offers from "./pages/Offers";
+import DailyReport from "./pages/DailyReport";
+import StockAlertsPage from "./pages/StockAlertsPage";
+import TopSellingPage from "./pages/TopSellingPage";
+import ProductPerformanceReport from "./pages/ProductPerformanceReport";
+import ProfitLossReport from "./pages/ProfitLossReport";
+import CashFlowPage from "./pages/CashFlowPage";
+import SuppliersDuesPage from "./pages/SuppliersDuesPage";
+import MonthlyReportsPage from "./pages/MonthlyReportsPage";
 
 function App() {
   // 1. استرجاع بيانات اليوزر من المتصفح عند التحميل لأول مرة
@@ -92,7 +101,7 @@ element={!isAuthenticated ? <Login onLogin={handleLoginSuccess} showToast={showT
           <Route path="products" element={<ProductsPage showToast={showToast} />} />
           <Route path="commission-report" element={<CommissionReport showToast={showToast} />} />
           <Route path="cashier" element={<CashierPage showToast={showToast} />} />
-<Route path="cashier/edit/:invoiceId" element={<CashierPage showToast={showToast} />} />
+<Route path="offers" element={<Offers showToast={showToast} />} />
           <Route path="salesLog" element={<SalesLog showToast={showToast} />} />
           <Route path="returns" element={<ReturnsPage showToast={showToast} />} />
           <Route path="installments" element={<InstallmentCollection showToast={showToast} />} />
@@ -102,6 +111,14 @@ element={!isAuthenticated ? <Login onLogin={handleLoginSuccess} showToast={showT
           <Route path="barcode" element={<BarcodePrintPage showToast={showToast} />} />
           <Route path="expenses" element={<ExpensesPage showToast={showToast} />} />
           <Route path="attendance" element={<AttendancePage showToast={showToast} />} />
+          <Route path="reports/daily" element={<DailyReport showToast={showToast} />} />
+          <Route path="reports/stock-alerts" element={<StockAlertsPage showToast={showToast} />} />
+          <Route path="/reports/top-selling" element={<TopSellingPage showToast={showToast} />} />
+          <Route path="/reports/product-performance" element={<ProductPerformanceReport showToast={showToast} />} />
+          <Route path="/reports/profit-loss" element={<ProfitLossReport showToast={showToast} />} />
+          <Route path="/safe" element={<CashFlowPage showToast={showToast} />} />
+          <Route path="/supplier-payments" element={<SuppliersDuesPage showToast={showToast} />} />
+          <Route path="reports/monthly" element={<MonthlyReportsPage showToast={showToast} />} />
           <Route path="inventory" element={<InventoryPage showToast={showToast} />} />
           <Route path="editBill" element={<EditBill showToast={showToast} />} />
           <Route path="settings" element={<SettingsPage showToast={showToast} />} />
